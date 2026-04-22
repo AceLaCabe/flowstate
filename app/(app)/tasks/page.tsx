@@ -1,5 +1,13 @@
-// app/tasks/page.tsx
+// app/(app)/tasks/page.tsx
+
+import { Suspense } from "react";
+import TasksFallback from "./tasks-fallback";
+import TasksContent from "./tasks-content";
 
 export default function TasksPage() {
-  return <div className="p-8">Tasks page</div>;
+  return (
+    <Suspense fallback={<TasksFallback />}>
+      <TasksContent />
+    </Suspense>
+  );
 }

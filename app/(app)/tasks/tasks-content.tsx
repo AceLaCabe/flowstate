@@ -1,10 +1,10 @@
 // app/(app)/tasks/tasks-content.tsx
-
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import AppShell from "@/components/layout/app-shell";
 import CreateTaskForm from "@/components/forms/create-task-form";
 import TaskToggleButton from "@/components/tasks/task-toggle-button";
+import EditTaskForm from "@/components/tasks/edit-task-form";
 
 function formatDueDate(date: string | null) {
   if (!date) return "No due date";
@@ -29,13 +29,16 @@ function getPriorityStyles(priority: string) {
 type TaskWithProject = {
   id: string;
   title: string;
+  description: string | null;
   completed: boolean;
   due_date: string | null;
   priority: string;
   created_at: string;
+  project_id: string;
   projects: {
     id: string;
     title: string;
+    workspace_id?: string;
   } | null;
 };
 
@@ -50,11 +53,15 @@ export default async function TasksContent() {
     redirect("/auth/login");
   }
 
-  const { data: profile } = await supabase
+  const { data: profile, error: profileError } = await supabase
     .from("profiles")
     .select("first_name, last_name, avatar_url")
     .eq("id", user.id)
     .single();
+
+  if (profileError) {
+    throw new Error(`Profile load failed: ${profileError.message}`);
+  }
 
   const { data: workspace, error: workspaceError } = await supabase
     .from("workspaces")
@@ -82,7 +89,9 @@ export default async function TasksContent() {
 
   const { data: tasks, error: tasksError } = await supabase
     .from("tasks")
-    .select("id, title, completed, due_date, priority, created_at, projects!inner(id, title, workspace_id)")
+    .select(
+      "id, title, description, completed, due_date, priority, created_at, project_id, projects!inner(id, title, workspace_id)"
+    )
     .eq("projects.workspace_id", workspace.id)
     .order("created_at", { ascending: false });
 
@@ -136,7 +145,10 @@ export default async function TasksContent() {
                   className="rounded-xl border border-black/10 bg-[#fafaf7] p-4"
                 >
                   <div className="flex items-start gap-3">
-                    <TaskToggleButton taskId={task.id} completed={task.completed} />
+                    <TaskToggleButton
+                      taskId={task.id}
+                      completed={task.completed}
+                    />
 
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -158,9 +170,27 @@ export default async function TasksContent() {
                         </span>
                       </div>
 
-                      <p className="mt-3 text-sm text-black/55">
-                        Due: {formatDueDate(task.due_date)}
-                      </p>
+                      {task.description && (
+                        <p className="mt-3 text-sm leading-6 text-black/65">
+                          {task.description}
+                        </p>
+                      )}
+
+                      <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <p className="text-sm text-black/55">
+                          Due: {formatDueDate(task.due_date)}
+                        </p>
+
+                        <EditTaskForm
+                          taskId={task.id}
+                          initialTitle={task.title}
+                          initialDescription={task.description}
+                          initialDueDate={task.due_date}
+                          initialPriority={task.priority}
+                          initialProjectId={task.project_id}
+                          projects={projects ?? []}
+                        />
+                      </div>
                     </div>
                   </div>
                 </article>
@@ -197,7 +227,10 @@ export default async function TasksContent() {
                   className="rounded-xl border border-black/10 bg-[#fafaf7] p-4 opacity-80"
                 >
                   <div className="flex items-start gap-3">
-                    <TaskToggleButton taskId={task.id} completed={task.completed} />
+                    <TaskToggleButton
+                      taskId={task.id}
+                      completed={task.completed}
+                    />
 
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -219,9 +252,27 @@ export default async function TasksContent() {
                         </span>
                       </div>
 
-                      <p className="mt-3 text-sm text-black/55">
-                        Due: {formatDueDate(task.due_date)}
-                      </p>
+                      {task.description && (
+                        <p className="mt-3 text-sm leading-6 text-black/65">
+                          {task.description}
+                        </p>
+                      )}
+
+                      <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <p className="text-sm text-black/55">
+                          Due: {formatDueDate(task.due_date)}
+                        </p>
+
+                        <EditTaskForm
+                          taskId={task.id}
+                          initialTitle={task.title}
+                          initialDescription={task.description}
+                          initialDueDate={task.due_date}
+                          initialPriority={task.priority}
+                          initialProjectId={task.project_id}
+                          projects={projects ?? []}
+                        />
+                      </div>
                     </div>
                   </div>
                 </article>
@@ -229,9 +280,12 @@ export default async function TasksContent() {
             </div>
           ) : (
             <div className="rounded-xl border border-dashed border-black/15 bg-[#fafaf7] p-4">
-              <p className="text-sm font-medium text-black">Nothing completed yet</p>
+              <p className="text-sm font-medium text-black">
+                Nothing completed yet
+              </p>
               <p className="mt-1 text-sm text-black/60">
-                Completed tasks will show up here once you start checking things off.
+                Completed tasks will show up here once you start checking things
+                off.
               </p>
             </div>
           )}

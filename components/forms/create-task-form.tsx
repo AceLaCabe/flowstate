@@ -1,5 +1,4 @@
 // components/forms/create-task-form.tsx
-
 "use client";
 
 import { useState, useTransition } from "react";
@@ -19,6 +18,7 @@ export default function CreateTaskForm({ projects }: CreateTaskFormProps) {
   const router = useRouter();
   const [isExpanded, setIsExpanded] = useState(false);
   const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
   const [projectId, setProjectId] = useState(projects[0]?.id ?? "");
   const [dueDate, setDueDate] = useState("");
   const [priority, setPriority] = useState("medium");
@@ -27,6 +27,7 @@ export default function CreateTaskForm({ projects }: CreateTaskFormProps) {
 
   const resetForm = () => {
     setTitle("");
+    setDescription("");
     setProjectId(projects[0]?.id ?? "");
     setDueDate("");
     setPriority("medium");
@@ -42,6 +43,7 @@ export default function CreateTaskForm({ projects }: CreateTaskFormProps) {
     setError(null);
 
     const trimmedTitle = title.trim();
+    const trimmedDescription = description.trim();
 
     if (!trimmedTitle) {
       setError("Please enter a task title.");
@@ -56,6 +58,7 @@ export default function CreateTaskForm({ projects }: CreateTaskFormProps) {
     startTransition(async () => {
       const { error } = await supabase.from("tasks").insert({
         title: trimmedTitle,
+        description: trimmedDescription || null,
         project_id: projectId,
         due_date: dueDate || null,
         priority,
@@ -126,6 +129,20 @@ export default function CreateTaskForm({ projects }: CreateTaskFormProps) {
             placeholder="Draft homepage copy"
             className="w-full rounded-xl border border-black/15 bg-white px-4 py-3 text-sm text-black outline-none transition placeholder:text-black/35 focus:border-black/30 focus:ring-2 focus:ring-black/10"
             required
+          />
+        </div>
+
+        <div className="grid gap-2">
+          <label htmlFor="task-description" className="text-sm font-medium text-black">
+            Description <span className="text-black/45">(optional)</span>
+          </label>
+          <textarea
+            id="task-description"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder="Add notes, context, or details for this task."
+            rows={3}
+            className="w-full rounded-xl border border-black/15 bg-white px-4 py-3 text-sm text-black outline-none transition placeholder:text-black/35 focus:border-black/30 focus:ring-2 focus:ring-black/10"
           />
         </div>
 
