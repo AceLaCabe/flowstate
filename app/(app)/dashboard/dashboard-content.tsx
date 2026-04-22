@@ -1,7 +1,54 @@
 // app/(app)/dashboard/dashboard-content.tsx
+
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import AppShell from "@/components/layout/app-shell";
+
+function formatDueDate(date: string | null) {
+  if (!date) return "No due date";
+  return new Date(`${date}T00:00:00`).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+function isOverdue(dueDate: string | null, completed: boolean) {
+  if (!dueDate || completed) return false;
+
+  const today = new Date();
+  const todayOnly = new Date(
+    today.getFullYear(),
+    today.getMonth(),
+    today.getDate()
+  );
+  const due = new Date(`${dueDate}T00:00:00`);
+
+  return due < todayOnly;
+}
+
+type ProjectSummary = {
+  id: string;
+  title: string;
+  status: string;
+  due_date: string | null;
+  created_at: string;
+};
+
+type TaskSummary = {
+  id: string;
+  title: string;
+  completed: boolean;
+  due_date: string | null;
+  priority: string;
+  created_at: string;
+  projects: {
+    id: string;
+    title: string;
+    workspace_id?: string;
+  }[];
+};
 
 export default async function DashboardContent() {
   const supabase = await createClient();
@@ -69,71 +116,68 @@ export default async function DashboardContent() {
     }
   }
 
-  const today = new Date().toISOString().slice(0, 10);
-  const nextWeek = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
-    .toISOString()
-    .slice(0, 10);
-  const nowIso = new Date().toISOString();
+  const { data: projects, error: projectsError } = await supabase
+    .from("projects")
+    .select("id, title, status, due_date, created_at")
+    .eq("workspace_id", workspaceId)
+    .order("created_at", { ascending: false });
 
-  const [
-    { count: activeProjectsCount, error: projectsCountError },
-    { count: tasksDueSoonCount, error: tasksCountError },
-    { count: upcomingEventsCount, error: eventsCountError },
-    { count: teamMembersCount, error: membersCountError },
-    { data: recentProjects, error: recentProjectsError },
-  ] = await Promise.all([
-    supabase
-      .from("projects")
-      .select("*", { count: "exact", head: true })
-      .eq("workspace_id", workspaceId)
-      .eq("status", "active"),
-
-    supabase
-      .from("tasks")
-      .select("id, projects!inner(workspace_id)", { count: "exact", head: true })
-      .eq("completed", false)
-      .gte("due_date", today)
-      .lte("due_date", nextWeek)
-      .eq("projects.workspace_id", workspaceId),
-
-    supabase
-      .from("events")
-      .select("*", { count: "exact", head: true })
-      .eq("workspace_id", workspaceId)
-      .gte("start_time", nowIso),
-
-    supabase
-      .from("workspace_members")
-      .select("*", { count: "exact", head: true })
-      .eq("workspace_id", workspaceId),
-
-    supabase
-      .from("projects")
-      .select("id, title, status, due_date, created_at")
-      .eq("workspace_id", workspaceId)
-      .order("created_at", { ascending: false })
-      .limit(3),
-  ]);
-
-  if (projectsCountError) {
-    throw new Error(`Active projects count failed: ${projectsCountError.message}`);
+  if (projectsError) {
+    throw new Error(`Projects load failed: ${projectsError.message}`);
   }
 
-  if (tasksCountError) {
-    throw new Error(`Tasks count failed: ${tasksCountError.message}`);
+  const { data: tasks, error: tasksError } = await supabase
+    .from("tasks")
+    .select(
+      "id, title, completed, due_date, priority, created_at, projects!inner(id, title, workspace_id)"
+    )
+    .eq("projects.workspace_id", workspaceId)
+    .order("created_at", { ascending: false });
+
+  if (tasksError) {
+    throw new Error(`Tasks load failed: ${tasksError.message}`);
   }
 
-  if (eventsCountError) {
-    throw new Error(`Events count failed: ${eventsCountError.message}`);
+  const { data: events, error: eventsError } = await supabase
+    .from("events")
+    .select("id")
+    .eq("workspace_id", workspaceId);
+
+  if (eventsError) {
+    throw new Error(`Events load failed: ${eventsError.message}`);
   }
 
-  if (membersCountError) {
-    throw new Error(`Team member count failed: ${membersCountError.message}`);
+  const { data: members, error: membersError } = await supabase
+    .from("workspace_members")
+    .select("id")
+    .eq("workspace_id", workspaceId);
+
+  if (membersError) {
+    throw new Error(`Workspace members load failed: ${membersError.message}`);
   }
 
-  if (recentProjectsError) {
-    throw new Error(`Recent projects load failed: ${recentProjectsError.message}`);
-  }
+  const normalizedProjects = (projects ?? []) as ProjectSummary[];
+  const normalizedTasks = (tasks ?? []) as unknown as TaskSummary[];
+
+  const activeProjects = normalizedProjects.filter(
+    (project) => project.status === "active"
+  );
+  const openTasks = normalizedTasks.filter((task) => !task.completed);
+  const highPriorityTasks = openTasks.filter((task) => task.priority === "high");
+  const overdueTasks = openTasks.filter((task) =>
+    isOverdue(task.due_date, task.completed)
+  );
+
+  const dueSoonTasks = openTasks
+    .filter((task) => task.due_date)
+    .sort((a, b) => {
+      const aTime = new Date(`${a.due_date}T00:00:00`).getTime();
+      const bTime = new Date(`${b.due_date}T00:00:00`).getTime();
+      return aTime - bTime;
+    })
+    .slice(0, 4);
+
+  const recentProjects = normalizedProjects.slice(0, 3);
 
   return (
     <AppShell
@@ -162,117 +206,187 @@ export default async function DashboardContent() {
         <section className="rounded-2xl border border-black/10 bg-white p-5 shadow-sm">
           <h3 className="text-sm font-medium text-black/70">Active Projects</h3>
           <p className="mt-3 text-3xl font-semibold text-black">
-            {activeProjectsCount ?? 0}
+            {activeProjects.length}
           </p>
           <p className="mt-2 text-sm text-black/55">Projects currently in progress</p>
         </section>
 
         <section className="rounded-2xl border border-black/10 bg-white p-5 shadow-sm">
-          <h3 className="text-sm font-medium text-black/70">Tasks Due Soon</h3>
+          <h3 className="text-sm font-medium text-black/70">Open Tasks</h3>
           <p className="mt-3 text-3xl font-semibold text-black">
-            {tasksDueSoonCount ?? 0}
+            {openTasks.length}
           </p>
-          <p className="mt-2 text-sm text-black/55">Due in the next 7 days</p>
+          <p className="mt-2 text-sm text-black/55">Tasks still in motion</p>
         </section>
 
         <section className="rounded-2xl border border-black/10 bg-white p-5 shadow-sm">
-          <h3 className="text-sm font-medium text-black/70">Upcoming Events</h3>
+          <h3 className="text-sm font-medium text-black/70">Overdue Tasks</h3>
           <p className="mt-3 text-3xl font-semibold text-black">
-            {upcomingEventsCount ?? 0}
+            {overdueTasks.length}
           </p>
-          <p className="mt-2 text-sm text-black/55">Scheduled from now onward</p>
+          <p className="mt-2 text-sm text-black/55">Past due and unfinished</p>
         </section>
 
         <section className="rounded-2xl border border-black/10 bg-white p-5 shadow-sm">
           <h3 className="text-sm font-medium text-black/70">Team Members</h3>
           <p className="mt-3 text-3xl font-semibold text-black">
-            {teamMembersCount ?? 0}
+            {members?.length ?? 0}
           </p>
           <p className="mt-2 text-sm text-black/55">People in this workspace</p>
         </section>
       </div>
 
-      <div className="mt-8 grid gap-6 xl:grid-cols-[1.4fr_0.9fr]">
-        <section className="rounded-2xl border border-black/10 bg-white p-5 sm:p-6 shadow-sm">
+      <div className="mt-8 grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
+        <section className="rounded-2xl border border-black/10 bg-white p-5 shadow-sm sm:p-6">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <h3 className="text-xl font-semibold text-black">Recent Projects</h3>
+              <h3 className="text-xl font-semibold text-black">Due Soon</h3>
               <p className="mt-2 text-black/70">
-                Your most recently created projects appear here.
+                Your nearest upcoming task deadlines.
               </p>
             </div>
             <span className="inline-flex w-fit rounded-full bg-black/5 px-3 py-1 text-xs font-medium text-black/70">
-              Live Data
+              Live
             </span>
           </div>
 
           <div className="mt-6 space-y-4">
-            {recentProjects && recentProjects.length > 0 ? (
-              recentProjects.map((project) => (
+            {dueSoonTasks.length > 0 ? (
+              dueSoonTasks.map((task) => (
                 <div
-                  key={project.id}
+                  key={task.id}
                   className="rounded-xl border border-black/10 bg-[#fafaf7] p-4"
                 >
-                  <div className="flex items-start justify-between gap-3">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div>
-                      <p className="text-sm font-medium text-black">{project.title}</p>
-                      <p className="mt-1 text-sm text-black/60 capitalize">
-                        {project.status === "on_hold" ? "On hold" : project.status}
+                      <p className="text-sm font-medium text-black">{task.title}</p>
+                      <p className="mt-1 text-sm text-black/60">
+                        {task.projects?.[0]?.title ?? "No project"}
                       </p>
                     </div>
-                    <p className="text-xs text-black/50">
-                      {project.due_date ? project.due_date : "No due date"}
-                    </p>
+
+                    <div className="flex flex-wrap gap-2">
+                      {task.priority === "high" && (
+                        <span className="rounded-full bg-red-100 px-2.5 py-1 text-[11px] font-medium text-red-700">
+                          High
+                        </span>
+                      )}
+                      {isOverdue(task.due_date, task.completed) && (
+                        <span className="rounded-full bg-red-100 px-2.5 py-1 text-[11px] font-medium text-red-700">
+                          Overdue
+                        </span>
+                      )}
+                    </div>
                   </div>
+
+                  <p className="mt-3 text-sm text-black/55">
+                    Due: {formatDueDate(task.due_date)}
+                  </p>
                 </div>
               ))
             ) : (
               <div className="rounded-xl border border-dashed border-black/15 bg-[#fafaf7] p-4">
-                <p className="text-sm font-medium text-black">No projects yet</p>
+                <p className="text-sm font-medium text-black">Nothing due soon</p>
                 <p className="mt-1 text-sm text-black/60">
-                  Create your first project to start filling your dashboard with real data.
+                  Create tasks with due dates to see upcoming priorities here.
                 </p>
               </div>
             )}
           </div>
         </section>
 
-        <section className="rounded-2xl border border-black/10 bg-white p-5 sm:p-6 shadow-sm">
-          <h3 className="text-xl font-semibold text-black">Quick Actions</h3>
+        <section className="rounded-2xl border border-black/10 bg-white p-5 shadow-sm sm:p-6">
+          <h3 className="text-xl font-semibold text-black">Quick Snapshot</h3>
           <p className="mt-2 text-sm text-black/65">
-            Keep your workspace moving.
+            The most important signals from your workspace.
           </p>
 
-          <div className="mt-4 space-y-3">
-            <a
+          <div className="mt-5 space-y-4">
+            <div className="rounded-xl bg-[#fafaf7] p-4">
+              <p className="text-sm text-black/55">High Priority</p>
+              <p className="mt-2 text-2xl font-semibold text-black">
+                {highPriorityTasks.length}
+              </p>
+            </div>
+
+            <div className="rounded-xl bg-[#fafaf7] p-4">
+              <p className="text-sm text-black/55">Upcoming Events</p>
+              <p className="mt-2 text-2xl font-semibold text-black">
+                {events?.length ?? 0}
+              </p>
+            </div>
+
+            <div className="rounded-xl bg-[#fafaf7] p-4">
+              <p className="text-sm text-black/55">Recent Projects</p>
+              <p className="mt-2 text-2xl font-semibold text-black">
+                {recentProjects.length}
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-6 space-y-3">
+            <Link
               href="/projects"
               className="block w-full rounded-xl bg-black px-4 py-3 text-left text-sm font-medium text-white transition hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black focus-visible:ring-offset-2"
             >
               Go to Projects
-            </a>
+            </Link>
 
-            <a
+            <Link
               href="/tasks"
               className="block w-full rounded-xl border border-black/15 bg-white px-4 py-3 text-left text-sm font-medium text-black transition hover:bg-black/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black focus-visible:ring-offset-2"
             >
               View Tasks
-            </a>
+            </Link>
 
-            <a
+            <Link
               href="/calendar"
               className="block w-full rounded-xl border border-black/15 bg-white px-4 py-3 text-left text-sm font-medium text-black transition hover:bg-black/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black focus-visible:ring-offset-2"
             >
               View Calendar
-            </a>
-          </div>
-
-          <div className="mt-6 rounded-xl bg-[#fafaf7] p-4">
-            <p className="text-sm font-medium text-black">Next best step</p>
-            <p className="mt-1 text-sm text-black/60">
-              Add tasks and events next so your dashboard reflects your real workload.
-            </p>
+            </Link>
           </div>
         </section>
+      </div>
+
+      <div className="mt-8 rounded-2xl border border-black/10 bg-white p-5 shadow-sm sm:p-6">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <h3 className="text-xl font-semibold text-black">Recent Projects</h3>
+            <p className="mt-2 text-black/70">
+              Your newest project spaces and current momentum.
+            </p>
+          </div>
+          <span className="inline-flex w-fit rounded-full bg-black/5 px-3 py-1 text-xs font-medium text-black/70">
+            Workspace
+          </span>
+        </div>
+
+        <div className="mt-6 grid gap-4 lg:grid-cols-3">
+          {recentProjects.length > 0 ? (
+            recentProjects.map((project) => (
+              <div
+                key={project.id}
+                className="rounded-xl border border-black/10 bg-[#fafaf7] p-4"
+              >
+                <p className="text-base font-semibold text-black">{project.title}</p>
+                <p className="mt-2 text-sm capitalize text-black/60">
+                  {project.status === "on_hold" ? "On hold" : project.status}
+                </p>
+                <p className="mt-3 text-sm text-black/55">
+                  Due: {formatDueDate(project.due_date)}
+                </p>
+              </div>
+            ))
+          ) : (
+            <div className="rounded-xl border border-dashed border-black/15 bg-[#fafaf7] p-4 lg:col-span-3">
+              <p className="text-sm font-medium text-black">No projects yet</p>
+              <p className="mt-1 text-sm text-black/60">
+                Create your first project to start filling your dashboard with live data.
+              </p>
+            </div>
+          )}
+        </div>
       </div>
     </AppShell>
   );
