@@ -1,3 +1,4 @@
+// components/auth/forgot-password-form.tsx
 "use client";
 
 import { cn } from "@/lib/utils";
@@ -26,16 +27,18 @@ export function ForgotPasswordForm({
 
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
+
     const supabase = createClient();
     setIsLoading(true);
     setError(null);
 
     try {
-      // The url which will be included in the email. This URL needs to be configured in your redirect URLs in the Supabase dashboard at https://supabase.com/dashboard/project/_/auth/url-configuration
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: `${window.location.origin}/auth/update-password`,
       });
+
       if (error) throw error;
+
       setSuccess(true);
     } catch (error: unknown) {
       setError(error instanceof Error ? error.message : "An error occurred");
@@ -47,32 +50,52 @@ export function ForgotPasswordForm({
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
       {success ? (
-        <Card>
+        <Card className="border-black/10 shadow-[0_14px_40px_rgba(0,0,0,0.06)]">
           <CardHeader>
             <CardTitle className="text-2xl">Check Your Email</CardTitle>
-            <CardDescription>Password reset instructions sent</CardDescription>
+            <CardDescription>
+              Password reset instructions sent
+            </CardDescription>
           </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">
-              If you registered using your email and password, you will receive
-              a password reset email.
+
+          <CardContent className="space-y-6">
+            <p className="text-sm leading-6 text-muted-foreground">
+              If you registered using email and password, you’ll receive a reset
+              link shortly.
             </p>
+
+            <div className="flex flex-col gap-3">
+              <Link href="/auth/login" className="w-full">
+                <Button className="w-full">Back to Login</Button>
+              </Link>
+
+              <Link href="/" className="w-full">
+                <Button
+                  variant="outline"
+                  className="w-full border-black/15 bg-white hover:bg-black/5"
+                >
+                  Return Home
+                </Button>
+              </Link>
+            </div>
           </CardContent>
         </Card>
       ) : (
-        <Card>
+        <Card className="border-black/10 shadow-[0_14px_40px_rgba(0,0,0,0.06)]">
           <CardHeader>
             <CardTitle className="text-2xl">Reset Your Password</CardTitle>
+
             <CardDescription>
-              Type in your email and we&apos;ll send you a link to reset your
-              password
+              Enter your email and we&apos;ll send you a secure reset link.
             </CardDescription>
           </CardHeader>
+
           <CardContent>
             <form onSubmit={handleForgotPassword}>
               <div className="flex flex-col gap-6">
                 <div className="grid gap-2">
                   <Label htmlFor="email">Email</Label>
+
                   <Input
                     id="email"
                     type="email"
@@ -82,18 +105,37 @@ export function ForgotPasswordForm({
                     onChange={(e) => setEmail(e.target.value)}
                   />
                 </div>
-                {error && <p className="text-sm text-red-500">{error}</p>}
-                <Button type="submit" className="w-full" disabled={isLoading}>
+
+                {error && (
+                  <p className="text-sm text-red-500" role="alert">
+                    {error}
+                  </p>
+                )}
+
+                <Button
+                  type="submit"
+                  className="w-full"
+                  disabled={isLoading}
+                >
                   {isLoading ? "Sending..." : "Send reset email"}
                 </Button>
               </div>
-              <div className="mt-4 text-center text-sm">
-                Already have an account?{" "}
+
+              <div className="mt-4 flex flex-col items-center gap-3 text-sm sm:flex-row sm:justify-center">
                 <Link
                   href="/auth/login"
                   className="underline underline-offset-4"
                 >
-                  Login
+                  Back to Login
+                </Link>
+
+                <span className="hidden sm:inline text-black/30">•</span>
+
+                <Link
+                  href="/"
+                  className="underline underline-offset-4"
+                >
+                  Home
                 </Link>
               </div>
             </form>
