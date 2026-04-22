@@ -1,5 +1,13 @@
 // app/calendar/page.tsx
 
+import { Suspense } from "react";
+import CalendarFallback from "./calendar-fallback";
+import CalendarContent from "./calendar-content";
+
 export default function CalendarPage() {
-  return <div className="p-8">Calendar page</div>;
+  return (
+    <Suspense fallback={<CalendarFallback />}>
+      <CalendarContent />
+    </Suspense>
+  );
 }
