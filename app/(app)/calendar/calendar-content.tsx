@@ -6,6 +6,9 @@ import AppShell from "@/components/layout/app-shell";
 import CreateEventForm from "@/components/forms/create-event-form";
 import EditEventForm from "@/components/calendar/edit-event-form";
 import DeleteEventButton from "@/components/calendar/delete-event-button";
+import CalendarView, {
+  type CalendarEvent,
+} from "@/components/calendar/calendar-view";
 
 function formatEventDateTime(date: string) {
   return new Date(date).toLocaleString("en-US", {
@@ -71,6 +74,7 @@ export default async function CalendarContent() {
   }
 
   const normalizedEvents = (events ?? []) as EventSummary[];
+  const calendarEvents = normalizedEvents as CalendarEvent[];
   const now = new Date().getTime();
 
   const upcomingEvents = normalizedEvents.filter(
@@ -98,6 +102,10 @@ export default async function CalendarContent() {
 
       <div className="mb-8">
         <CreateEventForm workspaceId={workspace.id} />
+      </div>
+
+      <div className="mb-8">
+        <CalendarView events={calendarEvents} />
       </div>
 
       <div className="grid gap-6 xl:grid-cols-2">
