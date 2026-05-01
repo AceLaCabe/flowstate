@@ -20,12 +20,19 @@ function formatEventDateTime(date: string) {
   });
 }
 
+type EventTypeOption = {
+  id: string;
+  name: string;
+  color: string;
+};
+
 type EventSummary = {
   id: string;
   title: string;
   start_time: string;
   end_time: string;
   created_at: string;
+  event_type_id: string | null;
 };
 
 export default async function CalendarContent() {
@@ -63,9 +70,19 @@ export default async function CalendarContent() {
     redirect("/dashboard");
   }
 
+  const { data: eventTypes, error: eventTypesError } = await supabase
+    .from("event_types")
+    .select("id, name, color")
+    .eq("workspace_id", workspace.id)
+    .order("name", { ascending: true });
+
+  if (eventTypesError) {
+    throw new Error(`Event types load failed: ${eventTypesError.message}`);
+  }
+
   const { data: events, error: eventsError } = await supabase
     .from("events")
-    .select("id, title, start_time, end_time, created_at")
+    .select("id, title, start_time, end_time, created_at, event_type_id")
     .eq("workspace_id", workspace.id)
     .order("start_time", { ascending: true });
 
@@ -73,6 +90,7 @@ export default async function CalendarContent() {
     throw new Error(`Events load failed: ${eventsError.message}`);
   }
 
+  const normalizedEventTypes = (eventTypes ?? []) as EventTypeOption[];
   const normalizedEvents = (events ?? []) as EventSummary[];
   const calendarEvents = normalizedEvents as CalendarEvent[];
   const now = new Date().getTime();
@@ -80,6 +98,7 @@ export default async function CalendarContent() {
   const upcomingEvents = normalizedEvents.filter(
     (event) => new Date(event.end_time).getTime() >= now
   );
+
   const pastEvents = normalizedEvents.filter(
     (event) => new Date(event.end_time).getTime() < now
   );
@@ -101,7 +120,10 @@ export default async function CalendarContent() {
       </div>
 
       <div className="mb-8">
-        <CreateEventForm workspaceId={workspace.id} />
+        <CreateEventForm
+          workspaceId={workspace.id}
+          eventTypes={normalizedEventTypes}
+        />
       </div>
 
       <div className="mb-8">
@@ -145,6 +167,8 @@ export default async function CalendarContent() {
                       initialTitle={event.title}
                       initialStartTime={event.start_time}
                       initialEndTime={event.end_time}
+                      initialEventTypeId={event.event_type_id}
+                      eventTypes={normalizedEventTypes}
                     />
                     <DeleteEventButton eventId={event.id} />
                   </div>
@@ -197,6 +221,8 @@ export default async function CalendarContent() {
                       initialTitle={event.title}
                       initialStartTime={event.start_time}
                       initialEndTime={event.end_time}
+                      initialEventTypeId={event.event_type_id}
+                      eventTypes={normalizedEventTypes}
                     />
                     <DeleteEventButton eventId={event.id} />
                   </div>

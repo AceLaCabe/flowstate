@@ -12,12 +12,11 @@ export default function HeroSection() {
         </p>
 
         <h1 className="max-w-4xl text-5xl font-semibold leading-[0.98] tracking-tight sm:text-6xl lg:text-7xl">
-          Your calm workspace for projects, schedules, and team flow.
+          A calm workspace that keeps projects, tasks, and teams moving—without the chaos.
         </h1>
 
         <p className="mt-6 max-w-2xl text-lg leading-8 text-[#5f6670] sm:text-xl">
-          Plan tasks, manage deadlines, organize assets, and collaborate in one
-          clear workspace designed to reduce chaos.
+          Plan tasks, manage deadlines, organize assets, and collaborate in one clear, structured workspace.
         </p>
 
         <p className="mt-5 text-base text-[#667085]">

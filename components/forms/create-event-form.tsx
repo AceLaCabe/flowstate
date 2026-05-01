@@ -6,8 +6,15 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
+type EventTypeOption = {
+  id: string;
+  name: string;
+  color: string;
+};
+
 type CreateEventFormProps = {
   workspaceId: string;
+  eventTypes: EventTypeOption[];
 };
 
 function startOfDayISOString(dateValue: string) {
@@ -20,10 +27,12 @@ function endOfDayISOString(dateValue: string) {
 
 export default function CreateEventForm({
   workspaceId,
+  eventTypes,
 }: CreateEventFormProps) {
   const router = useRouter();
   const [isExpanded, setIsExpanded] = useState(false);
   const [title, setTitle] = useState("");
+  const [eventTypeId, setEventTypeId] = useState(eventTypes[0]?.id ?? "");
   const [isAllDay, setIsAllDay] = useState(false);
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
@@ -34,6 +43,7 @@ export default function CreateEventForm({
 
   const resetForm = () => {
     setTitle("");
+    setEventTypeId(eventTypes[0]?.id ?? "");
     setIsAllDay(false);
     setStartDate("");
     setEndDate("");
@@ -101,6 +111,7 @@ export default function CreateEventForm({
         title: trimmedTitle,
         start_time: startISO,
         end_time: endISO,
+        event_type_id: eventTypeId || null,
       });
 
       if (error) {
@@ -160,6 +171,28 @@ export default function CreateEventForm({
           />
         </div>
 
+        <div className="grid gap-2">
+          <label htmlFor="event-type" className="text-sm font-medium text-black">
+            Event type
+          </label>
+          <select
+            id="event-type"
+            value={eventTypeId}
+            onChange={(e) => setEventTypeId(e.target.value)}
+            className="w-full rounded-xl border border-black/15 bg-white px-4 py-3 text-sm text-black outline-none transition focus:border-black/30 focus:ring-2 focus:ring-black/10"
+          >
+            {eventTypes.length > 0 ? (
+              eventTypes.map((type) => (
+                <option key={type.id} value={type.id}>
+                  {type.name}
+                </option>
+              ))
+            ) : (
+              <option value="">No event types yet</option>
+            )}
+          </select>
+        </div>
+
         <label className="flex items-center gap-3 rounded-xl border border-black/10 bg-[#fafaf7] px-4 py-3 text-sm text-black">
           <input
             type="checkbox"
@@ -202,10 +235,7 @@ export default function CreateEventForm({
         ) : (
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="grid gap-2">
-              <label
-                htmlFor="event-start-time"
-                className="text-sm font-medium text-black"
-              >
+              <label htmlFor="event-start-time" className="text-sm font-medium text-black">
                 Start time
               </label>
               <input
@@ -219,10 +249,7 @@ export default function CreateEventForm({
             </div>
 
             <div className="grid gap-2">
-              <label
-                htmlFor="event-end-time"
-                className="text-sm font-medium text-black"
-              >
+              <label htmlFor="event-end-time" className="text-sm font-medium text-black">
                 End time
               </label>
               <input

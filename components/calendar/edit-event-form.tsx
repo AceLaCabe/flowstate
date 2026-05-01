@@ -1,15 +1,24 @@
 // components/calendar/edit-event-form.tsx
+
 "use client";
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
+type EventTypeOption = {
+  id: string;
+  name: string;
+  color: string;
+};
+
 type EditEventFormProps = {
   eventId: string;
   initialTitle: string;
   initialStartTime: string;
   initialEndTime: string;
+  initialEventTypeId: string | null;
+  eventTypes: EventTypeOption[];
 };
 
 function toLocalDateTimeValue(isoString: string) {
@@ -54,12 +63,17 @@ export default function EditEventForm({
   initialTitle,
   initialStartTime,
   initialEndTime,
+  initialEventTypeId,
+  eventTypes,
 }: EditEventFormProps) {
   const router = useRouter();
   const initialAllDay = isMidnightToEndOfDay(initialStartTime, initialEndTime);
 
   const [isEditing, setIsEditing] = useState(false);
   const [title, setTitle] = useState(initialTitle);
+  const [eventTypeId, setEventTypeId] = useState(
+    initialEventTypeId ?? eventTypes[0]?.id ?? ""
+  );
   const [isAllDay, setIsAllDay] = useState(initialAllDay);
   const [startDate, setStartDate] = useState(toDateValue(initialStartTime));
   const [endDate, setEndDate] = useState(toDateValue(initialEndTime));
@@ -72,6 +86,7 @@ export default function EditEventForm({
 
   const resetForm = () => {
     setTitle(initialTitle);
+    setEventTypeId(initialEventTypeId ?? eventTypes[0]?.id ?? "");
     setIsAllDay(initialAllDay);
     setStartDate(toDateValue(initialStartTime));
     setEndDate(toDateValue(initialEndTime));
@@ -135,6 +150,7 @@ export default function EditEventForm({
           title: trimmedTitle,
           start_time: startISO,
           end_time: endISO,
+          event_type_id: eventTypeId || null,
         })
         .eq("id", eventId);
 
@@ -174,6 +190,25 @@ export default function EditEventForm({
           className="w-full rounded-xl border border-black/15 bg-white px-4 py-3 text-sm text-black outline-none transition focus:border-black/30 focus:ring-2 focus:ring-black/10"
           required
         />
+      </div>
+
+      <div className="grid gap-2">
+        <label className="text-sm font-medium text-black">Event type</label>
+        <select
+          value={eventTypeId}
+          onChange={(e) => setEventTypeId(e.target.value)}
+          className="w-full rounded-xl border border-black/15 bg-white px-4 py-3 text-sm text-black outline-none transition focus:border-black/30 focus:ring-2 focus:ring-black/10"
+        >
+          {eventTypes.length > 0 ? (
+            eventTypes.map((type) => (
+              <option key={type.id} value={type.id}>
+                {type.name}
+              </option>
+            ))
+          ) : (
+            <option value="">No event types yet</option>
+          )}
+        </select>
       </div>
 
       <label className="flex items-center gap-3 rounded-xl border border-black/10 bg-[#fafaf7] px-4 py-3 text-sm text-black">
