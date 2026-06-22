@@ -1,109 +1,390 @@
-<a href="https://demo-nextjs-with-supabase.vercel.app/">
-  <img alt="Next.js and Supabase Starter Kit - the fastest way to build apps with Next.js and Supabase" src="https://demo-nextjs-with-supabase.vercel.app/opengraph-image.png">
-  <h1 align="center">Next.js and Supabase Starter Kit</h1>
-</a>
+# Flowstate
 
-<p align="center">
- The fastest way to build apps with Next.js and Supabase
-</p>
+Flowstate is a calm planning workspace for organizing projects, tasks, schedules, files, and shared work in one focused place.
 
-<p align="center">
-  <a href="#features"><strong>Features</strong></a> ·
-  <a href="#demo"><strong>Demo</strong></a> ·
-  <a href="#deploy-to-vercel"><strong>Deploy to Vercel</strong></a> ·
-  <a href="#clone-and-run-locally"><strong>Clone and run locally</strong></a> ·
-  <a href="#feedback-and-issues"><strong>Feedback and issues</strong></a>
-  <a href="#more-supabase-examples"><strong>More Examples</strong></a>
-</p>
-<br/>
+It is designed for people managing multiple moving parts — freelancers, small teams, creative workers, agencies, families, and households — who need structure without the visual noise or overwhelm of traditional project management tools.
 
-## Features
+---
 
-- Works across the entire [Next.js](https://nextjs.org) stack
-  - App Router
-  - Pages Router
-  - Proxy
-  - Client
-  - Server
-  - It just works!
-- supabase-ssr. A package to configure Supabase Auth to use cookies
-- Password-based authentication block installed via the [Supabase UI Library](https://supabase.com/ui/docs/nextjs/password-based-auth)
-- Styling with [Tailwind CSS](https://tailwindcss.com)
-- Components with [shadcn/ui](https://ui.shadcn.com/)
-- Optional deployment with [Supabase Vercel Integration and Vercel deploy](#deploy-your-own)
-  - Environment variables automatically assigned to Vercel project
+## Why Flowstate Exists
 
-## Demo
+Planning tools can quickly become another source of stress.
 
-You can view a fully working demo at [demo-nextjs-with-supabase.vercel.app](https://demo-nextjs-with-supabase.vercel.app/).
+Many productivity apps are powerful, but they often feel heavy, corporate, or visually overwhelming. Flowstate approaches project management differently: it focuses on calm hierarchy, clear next actions, and flexible organization that can support both work and life.
 
-## Deploy to Vercel
+The goal is simple:
 
-Vercel deployment will guide you through creating a Supabase account and project.
+> Help users see what matters next without forcing them to process everything at once.
 
-After installation of the Supabase integration, all relevant environment variables will be assigned to the project so the deployment is fully functioning.
+---
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fvercel%2Fnext.js%2Ftree%2Fcanary%2Fexamples%2Fwith-supabase&project-name=nextjs-with-supabase&repository-name=nextjs-with-supabase&demo-title=nextjs-with-supabase&demo-description=This+starter+configures+Supabase+Auth+to+use+cookies%2C+making+the+user%27s+session+available+throughout+the+entire+Next.js+app+-+Client+Components%2C+Server+Components%2C+Route+Handlers%2C+Server+Actions+and+Middleware.&demo-url=https%3A%2F%2Fdemo-nextjs-with-supabase.vercel.app%2F&external-id=https%3A%2F%2Fgithub.com%2Fvercel%2Fnext.js%2Ftree%2Fcanary%2Fexamples%2Fwith-supabase&demo-image=https%3A%2F%2Fdemo-nextjs-with-supabase.vercel.app%2Fopengraph-image.png)
+## What Flowstate Does
 
-The above will also clone the Starter kit to your GitHub, you can clone that locally and develop locally.
+Flowstate helps users organize:
 
-If you wish to just develop locally and not deploy to Vercel, [follow the steps below](#clone-and-run-locally).
+* Projects
+* Tasks
+* Deadlines
+* Calendar events
+* Files and assets
+* Team or group collaboration
+* Account and workspace settings
 
-## Clone and run locally
+Instead of separating work across scattered notes, task lists, file folders, and calendars, Flowstate brings the core planning pieces into one connected workspace.
 
-1. You'll first need a Supabase project which can be made [via the Supabase dashboard](https://database.new)
+---
 
-2. Create a Next.js app using the Supabase Starter template npx command
+## Live Demo
 
-   ```bash
-   npx create-next-app --example with-supabase with-supabase-app
-   ```
+Flowstate includes a public demo route so visitors can explore the product without creating an account.
 
-   ```bash
-   yarn create next-app --example with-supabase with-supabase-app
-   ```
+```txt
+/demo
+```
 
-   ```bash
-   pnpm create next-app --example with-supabase with-supabase-app
-   ```
+The demo uses static sample data and lets users navigate through the main product areas:
 
-3. Use `cd` to change into the app's directory
+* Dashboard
+* Projects
+* Tasks
+* Calendar
 
-   ```bash
-   cd with-supabase-app
-   ```
+Demo actions such as creating, editing, deleting, and saving are intentionally disabled.
 
-4. Rename `.env.example` to `.env.local` and update the following:
+---
 
-  ```env
-  NEXT_PUBLIC_SUPABASE_URL=[INSERT SUPABASE PROJECT URL]
-  NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=[INSERT SUPABASE PROJECT API PUBLISHABLE OR ANON KEY]
-  ```
-  > [!NOTE]
-  > This example uses `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, which refers to Supabase's new **publishable** key format.
-  > Both legacy **anon** keys and new **publishable** keys can be used with this variable name during the transition period. Supabase's dashboard may show `NEXT_PUBLIC_SUPABASE_ANON_KEY`; its value can be used in this example.
-  > See the [full announcement](https://github.com/orgs/supabase/discussions/29260) for more information.
+## Core Product Areas
 
-  Both `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` can be found in [your Supabase project's API settings](https://supabase.com/dashboard/project/_?showConnect=true)
+### Dashboard
 
-5. You can now run the Next.js local development server:
+The dashboard gives users a calm workspace overview.
 
-   ```bash
-   npm run dev
-   ```
+It surfaces:
 
-   The starter kit should now be running on [localhost:3000](http://localhost:3000/).
+* Active projects
+* Open tasks
+* Overdue tasks
+* Team members
+* Upcoming events
+* One clear next action
 
-6. This template comes with the default shadcn/ui style initialized. If you instead want other ui.shadcn styles, delete `components.json` and [re-install shadcn/ui](https://ui.shadcn.com/docs/installation/next)
+The dashboard is designed to reduce scanning fatigue by helping users quickly understand what needs attention first.
 
-> Check out [the docs for Local Development](https://supabase.com/docs/guides/getting-started/local-development) to also run Supabase locally.
+---
 
-## Feedback and issues
+### Projects
 
-Please file feedback and issues over on the [Supabase GitHub org](https://github.com/supabase/supabase/issues/new/choose).
+Projects give tasks, files, events, and planning details a clear home.
 
-## More Supabase examples
+Users can organize projects by:
 
-- [Next.js Subscription Payments Starter](https://github.com/vercel/nextjs-subscription-payments)
-- [Cookie-based Auth and the Next.js 13 App Router (free course)](https://youtube.com/playlist?list=PL5S4mPUpp4OtMhpnp93EFSo42iQ40XjbF)
-- [Supabase Auth and the Next.js App Router](https://github.com/supabase/supabase/tree/master/examples/auth/nextjs)
+* Title
+* Description
+* Status
+* Due date
+* Current momentum
+
+Supported project statuses include:
+
+* Active
+* On hold
+* Completed
+
+Projects are useful for client work, creative initiatives, launches, household planning, personal goals, and team coordination.
+
+---
+
+### Tasks
+
+Tasks stay connected to projects so next actions do not float around without context.
+
+Users can:
+
+* Create tasks
+* Assign tasks to projects
+* Add descriptions
+* Set due dates
+* Assign priority
+* Mark tasks complete
+* Edit tasks
+* Delete tasks
+
+Task views highlight:
+
+* Open tasks
+* Completed tasks
+* High-priority tasks
+* Overdue tasks
+* Tasks with and without due dates
+
+---
+
+### Calendar
+
+The calendar gives users a schedule layer for time-based planning.
+
+Users can organize:
+
+* Meetings
+* Planning sessions
+* Deadlines
+* Important time blocks
+* Upcoming events
+* Past events
+
+Calendar views include:
+
+* Month view
+* Week view
+* Agenda view
+
+The calendar is designed to support different levels of visibility depending on how much detail the user needs.
+
+---
+
+### Assets
+
+The assets page is scaffolded for future file organization.
+
+It is designed to support:
+
+* PDFs
+* Word documents
+* Excel files
+* CSV files
+* PowerPoint decks
+* Audio files
+* Project references
+* Creative assets
+* Planning documents
+
+The intended future direction is for users to upload files and attach them to specific projects.
+
+---
+
+### Team
+
+The team page is scaffolded for future collaboration and group management.
+
+It is designed to support:
+
+* Workspace teams
+* Project groups
+* Family or household groups
+* Client review groups
+* Shared project visibility
+* Role-based access
+* Group leader controls
+
+This supports Flowstate’s larger goal of being useful for both professional teams and real-life coordination.
+
+---
+
+### Settings
+
+The settings area includes functional account controls and planned workspace preferences.
+
+Current account features include:
+
+* Updating user name
+* Changing email
+* Changing password
+* Logging out
+
+Planned settings include:
+
+* Workspace preferences
+* Group leader controls
+* Appearance options
+* Notification preferences
+* Security and access controls
+
+---
+
+## UX Principles
+
+Flowstate is built around a few core design principles.
+
+### Calm visual hierarchy
+
+The interface avoids unnecessary visual noise and uses spacing, soft contrast, rounded cards, and clear sections to make information easier to process.
+
+### One clear next action
+
+The dashboard and task experience are designed to help users identify the next best move instead of forcing them to scan every item manually.
+
+### Flexible work-life structure
+
+Flowstate is not limited to corporate project management. It can support client work, creative projects, household planning, family coordination, and personal organization.
+
+### Project-connected planning
+
+Tasks, events, files, and team activity are meant to connect back to project spaces so users can keep context intact.
+
+### Public portfolio access
+
+The public demo allows visitors, recruiters, and reviewers to explore the product without signing up or logging in.
+
+---
+
+## Tech Stack
+
+Flowstate is built with:
+
+* Next.js
+* React
+* TypeScript
+* Tailwind CSS
+* Supabase Auth
+* Supabase Database
+* Supabase SSR helpers
+
+---
+
+## Routes
+
+| Route                   | Purpose                        |
+| ----------------------- | ------------------------------ |
+| `/`                     | Marketing landing page         |
+| `/demo`                 | Public interactive demo        |
+| `/auth/login`           | Login page                     |
+| `/auth/sign-up`         | Account creation               |
+| `/auth/forgot-password` | Password recovery              |
+| `/dashboard`            | Authenticated dashboard        |
+| `/projects`             | Project planning               |
+| `/tasks`                | Task management                |
+| `/calendar`             | Schedule management            |
+| `/assets`               | Asset library scaffold         |
+| `/team`                 | Team and group scaffold        |
+| `/settings`             | Account and workspace settings |
+
+---
+
+## Public and Protected Routes
+
+Flowstate uses route protection for authenticated app pages.
+
+Public routes include:
+
+* `/`
+* `/demo`
+* `/auth/login`
+* `/auth/sign-up`
+* `/auth/forgot-password`
+* `/auth/confirm`
+* `/auth/error`
+
+Authenticated routes include:
+
+* `/dashboard`
+* `/projects`
+* `/tasks`
+* `/calendar`
+* `/assets`
+* `/team`
+* `/settings`
+
+The `/demo` route is intentionally public so portfolio visitors can preview the product without creating an account.
+
+---
+
+## Getting Started
+
+Install dependencies:
+
+```bash
+npm install
+```
+
+Create a `.env.local` file in the project root:
+
+```env
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=
+```
+
+Run the development server:
+
+```bash
+npm run dev
+```
+
+Open the app in your browser:
+
+```txt
+http://localhost:3000
+```
+
+---
+
+## Supabase Setup
+
+Flowstate uses Supabase for authentication and workspace data.
+
+The app currently expects tables for:
+
+* `profiles`
+* `workspaces`
+* `workspace_members`
+* `projects`
+* `tasks`
+* `events`
+
+The public demo route does not require Supabase data and can be viewed without logging in.
+
+---
+
+## Current Status
+
+Flowstate currently includes:
+
+* Polished marketing landing page
+* Public interactive demo
+* Authenticated dashboard
+* Project management
+* Task management
+* Calendar views
+* Assets scaffold
+* Team scaffold
+* Settings scaffold
+* Account settings form
+* Logout functionality
+* Public route exception for `/demo`
+
+---
+
+## Planned Improvements
+
+Future improvements may include:
+
+* Real file uploads through Supabase Storage
+* Project-specific asset libraries
+* Group creation
+* Team invitations
+* Role-based permissions
+* Workspace customization
+* Appearance settings
+* Notification preferences
+* Project detail pages
+* Task filtering by project and due date
+* Calendar events connected to projects and tasks
+* More robust demo interactions
+* File previews for uploaded assets
+
+---
+
+## Portfolio Purpose
+
+Flowstate was created as a portfolio project to demonstrate:
+
+* Product thinking
+* UX/UI design
+* Front-end development
+* Authentication workflows
+* Dashboard design
+* Route protection
+* Public demo access
+* Calm interface design
+* Multi-feature app architecture
+
+The project focuses on turning complex planning needs into a softer, more usable digital workspace.
