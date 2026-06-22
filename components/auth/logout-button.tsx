@@ -1,26 +1,41 @@
 // components/auth/logout-button.tsx
 "use client";
 
-import { createClient } from "@/lib/supabase/client";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
 
-export default function LogoutButton() {
+type LogoutButtonProps = {
+  className?: string;
+};
+
+export default function LogoutButton({ className }: LogoutButtonProps) {
   const router = useRouter();
+  const [isSigningOut, setIsSigningOut] = useState(false);
 
-  const handleLogout = async () => {
+  async function handleSignOut() {
+    if (isSigningOut) return;
+
+    setIsSigningOut(true);
+
     const supabase = createClient();
     await supabase.auth.signOut();
-    router.push("/auth/login");
+
+    router.replace("/auth/login");
     router.refresh();
-  };
+  }
 
   return (
     <button
       type="button"
-      onClick={handleLogout}
-      className="inline-flex w-fit items-center justify-center rounded-lg border border-black/10 px-3 py-1.5 text-xs font-medium text-black transition hover:bg-black/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black focus-visible:ring-offset-2"
+      onClick={handleSignOut}
+      disabled={isSigningOut}
+      className={
+        className ??
+        "inline-flex items-center justify-center rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60"
+      }
     >
-      Log out
+      {isSigningOut ? "Signing out…" : "Log out"}
     </button>
   );
 }

@@ -1,5 +1,4 @@
 // components/calendar/calendar-view.tsx
-
 "use client";
 
 import { useMemo, useState } from "react";
@@ -21,20 +20,46 @@ type CalendarViewProps = {
   events: CalendarEvent[];
 };
 
-function startOfWeek(date: Date) {
-  const d = new Date(date);
-  const day = d.getDay();
-  const diff = d.getDate() - day;
-  d.setDate(diff);
-  d.setHours(0, 0, 0, 0);
-  return d;
-}
-
 const viewOptions: { key: ViewKey; label: string }[] = [
   { key: "month", label: "Month" },
   { key: "week", label: "Week" },
   { key: "agenda", label: "Agenda" },
 ];
+
+function startOfWeek(date: Date) {
+  const d = new Date(date);
+  const day = d.getDay();
+  const diff = d.getDate() - day;
+
+  d.setDate(diff);
+  d.setHours(0, 0, 0, 0);
+
+  return d;
+}
+
+function getEventsForView(events: CalendarEvent[], view: ViewKey, currentDate: Date) {
+  if (view === "agenda") return events.length;
+
+  if (view === "month") {
+    return events.filter((event) => {
+      const eventDate = new Date(event.start_time);
+
+      return (
+        eventDate.getFullYear() === currentDate.getFullYear() &&
+        eventDate.getMonth() === currentDate.getMonth()
+      );
+    }).length;
+  }
+
+  const start = startOfWeek(currentDate);
+  const end = new Date(start);
+  end.setDate(start.getDate() + 7);
+
+  return events.filter((event) => {
+    const eventDate = new Date(event.start_time);
+    return eventDate >= start && eventDate < end;
+  }).length;
+}
 
 export default function CalendarView({ events }: CalendarViewProps) {
   const [view, setView] = useState<ViewKey>("month");
@@ -63,10 +88,14 @@ export default function CalendarView({ events }: CalendarViewProps) {
       })}`;
     }
 
-    return "All Scheduled Events";
+    return "All scheduled events";
   }, [currentDate, view]);
 
-  const goPrevious = () => {
+  const visibleEventCount = useMemo(() => {
+    return getEventsForView(events, view, currentDate);
+  }, [events, view, currentDate]);
+
+  function goPrevious() {
     const next = new Date(currentDate);
 
     if (view === "month") {
@@ -78,9 +107,9 @@ export default function CalendarView({ events }: CalendarViewProps) {
     }
 
     setCurrentDate(next);
-  };
+  }
 
-  const goNext = () => {
+  function goNext() {
     const next = new Date(currentDate);
 
     if (view === "month") {
@@ -92,18 +121,26 @@ export default function CalendarView({ events }: CalendarViewProps) {
     }
 
     setCurrentDate(next);
-  };
+  }
 
-  const goToday = () => {
+  function goToday() {
     setCurrentDate(new Date());
-  };
+  }
 
   return (
-    <section className="rounded-2xl border border-black/10 bg-white p-5 shadow-sm sm:p-6">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+    <section className="rounded-[2rem] border border-black/10 bg-white p-5 shadow-sm sm:p-6">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <p className="text-sm text-black/60">Visual calendar</p>
-          <h3 className="mt-1 text-2xl font-semibold text-black">{heading}</h3>
+          <p className="text-sm font-medium text-black/55">Visual calendar</p>
+
+          <h3 className="mt-1 text-2xl font-semibold tracking-tight text-black">
+            {heading}
+          </h3>
+
+          <p className="mt-2 text-sm text-black/60">
+            {visibleEventCount} event{visibleEventCount === 1 ? "" : "s"} in
+            this view.
+          </p>
         </div>
 
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -117,7 +154,7 @@ export default function CalendarView({ events }: CalendarViewProps) {
                   type="button"
                   onClick={() => setView(option.key)}
                   className={[
-                    "rounded-full px-4 py-2 text-sm font-medium transition",
+                    "rounded-full px-4 py-2 text-sm font-semibold transition",
                     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black focus-visible:ring-offset-2",
                     isActive
                       ? "bg-black text-white"
@@ -134,21 +171,23 @@ export default function CalendarView({ events }: CalendarViewProps) {
             <button
               type="button"
               onClick={goPrevious}
-              className="rounded-xl border border-black/10 px-3 py-2 text-sm font-medium text-black transition hover:bg-black/5"
+              className="rounded-xl border border-black/10 px-3 py-2 text-sm font-semibold text-black transition hover:bg-black/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black focus-visible:ring-offset-2"
             >
               Prev
             </button>
+
             <button
               type="button"
               onClick={goToday}
-              className="rounded-xl border border-black/10 px-3 py-2 text-sm font-medium text-black transition hover:bg-black/5"
+              className="rounded-xl border border-black/10 bg-[#fafaf7] px-3 py-2 text-sm font-semibold text-black transition hover:bg-black/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black focus-visible:ring-offset-2"
             >
               Today
             </button>
+
             <button
               type="button"
               onClick={goNext}
-              className="rounded-xl border border-black/10 px-3 py-2 text-sm font-medium text-black transition hover:bg-black/5"
+              className="rounded-xl border border-black/10 px-3 py-2 text-sm font-semibold text-black transition hover:bg-black/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black focus-visible:ring-offset-2"
             >
               Next
             </button>
@@ -157,17 +196,17 @@ export default function CalendarView({ events }: CalendarViewProps) {
       </div>
 
       <div className="mt-6">
-        {view === "month" && (
+        {view === "month" ? (
           <CalendarMonthView events={events} currentDate={currentDate} />
-        )}
+        ) : null}
 
-        {view === "week" && (
+        {view === "week" ? (
           <CalendarWeekView events={events} currentDate={currentDate} />
-        )}
+        ) : null}
 
-        {view === "agenda" && (
+        {view === "agenda" ? (
           <CalendarAgendaView events={events} currentDate={currentDate} />
-        )}
+        ) : null}
       </div>
     </section>
   );

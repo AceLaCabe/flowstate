@@ -1,5 +1,7 @@
 // components/layout/topbar.tsx
+
 import BrandLink from "./brand-link";
+import LogoutButton from "@/components/auth/logout-button";
 
 type TopbarProps = {
   firstName?: string;
@@ -12,7 +14,8 @@ type TopbarProps = {
 function getInitials(firstName?: string, lastName?: string) {
   const first = firstName?.trim().charAt(0).toUpperCase() || "";
   const last = lastName?.trim().charAt(0).toUpperCase() || "";
-  return (first + last) || "U";
+
+  return first + last || "U";
 }
 
 export default function Topbar({
@@ -41,6 +44,7 @@ export default function Topbar({
 
           <div className="hidden md:block">
             <p className="text-sm text-black/65">Welcome back</p>
+
             <h1 className="text-2xl font-semibold tracking-tight text-black">
               {title}
             </h1>
@@ -48,6 +52,14 @@ export default function Topbar({
         </div>
 
         <div className="flex items-center gap-3">
+          <div className="hidden text-right sm:block">
+            <p className="text-xs text-black/55">Account</p>
+
+            <p className="text-sm font-medium text-black">
+              {firstName || "User"}
+            </p>
+          </div>
+
           <div className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-full bg-black text-sm font-semibold text-white">
             {avatarUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
@@ -61,12 +73,7 @@ export default function Topbar({
             )}
           </div>
 
-          <div className="hidden text-left sm:block">
-            <p className="text-xs text-black/55">Account</p>
-            <p className="text-sm font-medium text-black">
-              {firstName || "User"}
-            </p>
-          </div>
+          <LogoutButton className="hidden rounded-xl border border-black/10 bg-white px-4 py-2 text-sm font-semibold text-black transition hover:bg-black/5 disabled:cursor-not-allowed disabled:opacity-60 sm:inline-flex" />
         </div>
       </div>
     </header>
