@@ -40,8 +40,10 @@ const navItems: { key: DemoView; label: string }[] = [
   { key: "calendar", label: "Calendar" },
 ];
 
+const DEMO_BASE_DATE = "2026-04-15T09:00:00.000Z";
+
 function addDays(days: number, hour = 9, minute = 0) {
-  const date = new Date();
+  const date = new Date(DEMO_BASE_DATE);
   date.setDate(date.getDate() + days);
   date.setHours(hour, minute, 0, 0);
   return date.toISOString();
