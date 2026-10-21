@@ -1,9 +1,10 @@
-//  components/layout/app-shell.tsx
+// components/layout/app-shell.tsx
 
 "use client";
 
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
+
 import Sidebar from "./sidebar";
 import Topbar from "./topbar";
 
@@ -14,14 +15,65 @@ type AppShellProps = {
   avatarUrl?: string | null;
 };
 
-function getPageTitle(pathname: string) {
-  if (pathname.startsWith("/projects")) return "Projects";
-  if (pathname.startsWith("/tasks")) return "Tasks";
-  if (pathname.startsWith("/calendar")) return "Calendar";
-  if (pathname.startsWith("/assets")) return "Assets";
-  if (pathname.startsWith("/team")) return "Team";
-  if (pathname.startsWith("/settings")) return "Settings";
-  return "Dashboard";
+type PageInfo = {
+  title: string;
+  context: string;
+};
+
+function getPageInfo(pathname: string): PageInfo {
+  if (pathname.startsWith("/projects/")) {
+    return {
+      title: "Project details",
+      context: "Workspace / Projects",
+    };
+  }
+
+  if (pathname.startsWith("/projects")) {
+    return {
+      title: "Projects",
+      context: "Workspace / Planning",
+    };
+  }
+
+  if (pathname.startsWith("/tasks")) {
+    return {
+      title: "Tasks",
+      context: "Workspace / My work",
+    };
+  }
+
+  if (pathname.startsWith("/calendar")) {
+    return {
+      title: "Calendar",
+      context: "Workspace / Schedule",
+    };
+  }
+
+  if (pathname.startsWith("/assets")) {
+    return {
+      title: "Assets",
+      context: "Workspace / Library",
+    };
+  }
+
+  if (pathname.startsWith("/team")) {
+    return {
+      title: "Team",
+      context: "Workspace / People",
+    };
+  }
+
+  if (pathname.startsWith("/settings")) {
+    return {
+      title: "Settings",
+      context: "Account / Preferences",
+    };
+  }
+
+  return {
+    title: "Dashboard",
+    context: "Workspace / Overview",
+  };
 }
 
 export default function AppShell({
@@ -31,7 +83,8 @@ export default function AppShell({
   avatarUrl,
 }: AppShellProps) {
   const pathname = usePathname();
-  const title = getPageTitle(pathname);
+  const { title, context } = getPageInfo(pathname);
+
   const [mobileOpen, setMobileOpen] = useState(false);
 
   useEffect(() => {
@@ -55,12 +108,13 @@ export default function AppShell({
           lastName={lastName}
         />
 
-        <div className="flex min-h-screen flex-1 flex-col">
+        <div className="flex min-h-screen min-w-0 flex-1 flex-col">
           <Topbar
             firstName={firstName}
             lastName={lastName}
             avatarUrl={avatarUrl}
             title={title}
+            context={context}
             onOpenMenu={() => setMobileOpen(true)}
           />
 
