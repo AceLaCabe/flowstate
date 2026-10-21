@@ -1,5 +1,4 @@
 // components/settings/account-settings-form.tsx
-// components/settings/account-settings-form.tsx
 "use client";
 
 import { type FormEvent, useState } from "react";

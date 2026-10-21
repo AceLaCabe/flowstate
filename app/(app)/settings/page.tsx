@@ -1,40 +1,38 @@
 // app/(app)/settings/page.tsx
 
 import { redirect } from "next/navigation";
+
 import { createClient } from "@/lib/supabase/server";
 import AppShell from "@/components/layout/app-shell";
+
 import LogoutButton from "@/components/auth/logout-button";
 import AccountSettingsForm from "@/components/settings/account-settings-form";
+import WorkspaceSettingsForm from "@/components/settings/workspace-settings-form";
 
-const settingSections = [
+const futureSettings = [
   {
-    title: "Workspace preferences",
+    title: "Team permissions",
     description:
-      "Customize workspace name, default views, project organization, and planning rhythm.",
-    status: "Planned",
-  },
-  {
-    title: "Group leader controls",
-    description:
-      "Manage group settings, permissions, member roles, and shared access rules.",
-    status: "Planned",
+      "Manage invitations, member roles, and workspace access.",
   },
   {
     title: "Appearance",
     description:
-      "Choose visual preferences like density, calm mode, color warmth, and reduced motion.",
-    status: "Planned",
+      "Customize display preferences and visual comfort.",
   },
   {
     title: "Notifications",
     description:
-      "Control reminders for due dates, upcoming events, project updates, and team activity.",
-    status: "Planned",
+      "Manage reminders for deadlines, events, and workspace activity.",
   },
 ];
 
 export default async function SettingsPage() {
   const supabase = await createClient();
+
+  /* --------------------------------------------------------
+     AUTHENTICATION
+  -------------------------------------------------------- */
 
   const {
     data: { user },
@@ -44,46 +42,81 @@ export default async function SettingsPage() {
     redirect("/auth/login");
   }
 
-  const { data: profile, error: profileError } = await supabase
-    .from("profiles")
-    .select("first_name, last_name, avatar_url")
-    .eq("id", user.id)
-    .maybeSingle();
+  /* --------------------------------------------------------
+     PROFILE
+  -------------------------------------------------------- */
+
+  const { data: profile, error: profileError } =
+    await supabase
+      .from("profiles")
+      .select("first_name, last_name, avatar_url")
+      .eq("id", user.id)
+      .maybeSingle();
 
   if (profileError) {
-    throw new Error(`Profile load failed: ${profileError.message}`);
+    throw new Error(
+      `Profile load failed: ${profileError.message}`
+    );
   }
 
-  const { data: workspace, error: workspaceError } = await supabase
-    .from("workspaces")
-    .select("id, name")
-    .eq("owner_id", user.id)
-    .maybeSingle();
+  /* --------------------------------------------------------
+     WORKSPACE
+  -------------------------------------------------------- */
+
+  const { data: workspace, error: workspaceError } =
+    await supabase
+      .from("workspaces")
+      .select("id, name, owner_id")
+      .eq("owner_id", user.id)
+      .maybeSingle();
 
   if (workspaceError) {
-    throw new Error(`Workspace lookup failed: ${workspaceError.message}`);
+    throw new Error(
+      `Workspace lookup failed: ${workspaceError.message}`
+    );
   }
 
   if (!workspace) {
     redirect("/dashboard");
   }
 
-  const { data: member, error: memberError } = await supabase
-    .from("workspace_members")
-    .select("role")
-    .eq("workspace_id", workspace.id)
-    .eq("user_id", user.id)
-    .maybeSingle();
+  /* --------------------------------------------------------
+     MEMBERSHIP
+  -------------------------------------------------------- */
+
+  const { data: member, error: memberError } =
+    await supabase
+      .from("workspace_members")
+      .select("role")
+      .eq("workspace_id", workspace.id)
+      .eq("user_id", user.id)
+      .maybeSingle();
 
   if (memberError) {
-    throw new Error(`Member role load failed: ${memberError.message}`);
+    throw new Error(
+      `Member role load failed: ${memberError.message}`
+    );
   }
+
+  /* --------------------------------------------------------
+     DISPLAY VALUES
+  -------------------------------------------------------- */
 
   const firstName = profile?.first_name ?? "User";
   const lastName = profile?.last_name ?? "";
-  const displayName = [firstName, lastName].filter(Boolean).join(" ");
-  const role = member?.role ?? "member";
-  const isLeader = role === "owner" || role === "admin";
+
+  const displayName =
+    [firstName, lastName].filter(Boolean).join(" ");
+
+  const isOwner = workspace.owner_id === user.id;
+
+  const role = isOwner
+    ? "owner"
+    : member?.role ?? "member";
+
+  /* ========================================================
+     SETTINGS PAGE
+  ======================================================== */
 
   return (
     <AppShell
@@ -91,65 +124,44 @@ export default async function SettingsPage() {
       lastName={lastName}
       avatarUrl={profile?.avatar_url ?? null}
     >
-      <section className="space-y-8">
-        <div className="grid gap-5 xl:grid-cols-[1.2fr_0.8fr]">
-          <div className="rounded-[2rem] border border-black/10 bg-white p-6 shadow-sm sm:p-7">
-            <p className="text-sm font-medium text-black/55">
-              Account settings
-            </p>
+      <div className="space-y-6">
 
-            <h2 className="mt-2 text-3xl font-semibold tracking-tight text-black sm:text-4xl">
-              Customize how Flowstate works for you.
-            </h2>
+        {/* ======================================
+            PAGE INTRODUCTION
+        ====================================== */}
 
-            <p className="mt-3 max-w-2xl text-sm leading-6 text-black/65 sm:text-base">
-              Update your account details, manage access, and prepare workspace
-              preferences for future group controls.
-            </p>
-
-            <div className="mt-6 rounded-2xl bg-[#fafaf7] p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-black/45">
-                Security note
+        <header className="rounded-[2rem] border border-black/10 bg-white p-5 shadow-sm sm:p-7">
+          <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+            <div className="max-w-2xl">
+              <p className="text-sm font-medium text-black/55">
+                Account and workspace
               </p>
 
-              <p className="mt-2 text-sm leading-6 text-black/65">
-                Email and password changes are handled through Supabase Auth.
-                Some changes may require confirmation depending on your auth
-                settings.
+              <h2 className="mt-2 text-3xl font-semibold tracking-tight text-black sm:text-4xl">
+                Settings
+              </h2>
+
+              <p className="mt-3 text-sm leading-6 text-black/65 sm:text-base">
+                Manage your personal account, security,
+                and workspace details.
+              </p>
+            </div>
+
+            <div className="rounded-2xl bg-[#fafaf7] px-4 py-3">
+              <p className="text-sm font-semibold text-black">
+                {displayName}
+              </p>
+
+              <p className="mt-1 text-xs capitalize text-black/55">
+                {role} · {workspace.name}
               </p>
             </div>
           </div>
+        </header>
 
-          <div className="rounded-[2rem] border border-[#d7bfa8]/60 bg-[#fff7ed] p-6 shadow-sm sm:p-7">
-            <p className="text-sm font-medium text-[#7b533e]">
-              Current account
-            </p>
-
-            <h3 className="mt-2 text-2xl font-semibold tracking-tight text-[#3b2418]">
-              {displayName}
-            </h3>
-
-            <p className="mt-3 text-sm leading-6 text-[#7b533e]">
-              {workspace.name} · {role}
-            </p>
-
-            <div className="mt-5 rounded-2xl bg-white/60 p-4">
-              <p className="text-sm font-semibold text-[#3b2418]">
-                {isLeader ? "Group leader controls enabled" : "Member settings"}
-              </p>
-
-              <p className="mt-1 text-sm leading-6 text-[#7b533e]">
-                {isLeader
-                  ? "This account can eventually manage workspace and group-level preferences."
-                  : "This account can eventually customize personal preferences."}
-              </p>
-            </div>
-
-            <div className="mt-5">
-              <LogoutButton />
-            </div>
-          </div>
-        </div>
+        {/* ======================================
+            ACCOUNT MANAGEMENT
+        ====================================== */}
 
         <AccountSettingsForm
           userId={user.id}
@@ -158,54 +170,105 @@ export default async function SettingsPage() {
           initialLastName={lastName}
         />
 
-        <section className="rounded-[2rem] border border-black/10 bg-white p-5 shadow-sm sm:p-6">
-          <div className="mb-6">
-            <p className="text-sm font-medium text-black/55">
-              Settings categories
-            </p>
+        {/* ======================================
+            WORKSPACE MANAGEMENT
+        ====================================== */}
 
-            <h3 className="mt-1 text-2xl font-semibold tracking-tight text-black">
-              Control center
+        {isOwner && (
+          <WorkspaceSettingsForm
+            workspaceId={workspace.id}
+            initialName={workspace.name}
+          />
+        )}
+
+        {/* ======================================
+            ACCOUNT SECURITY
+        ====================================== */}
+
+        <section
+          aria-labelledby="account-security-heading"
+          className="rounded-[2rem] border border-black/10 bg-white p-5 shadow-sm sm:p-6"
+        >
+          <p className="text-sm font-medium text-black/55">
+            Account security
+          </p>
+
+          <h3
+            id="account-security-heading"
+            className="mt-1 text-xl font-semibold tracking-tight text-black sm:text-2xl"
+          >
+            Sign-in and session
+          </h3>
+
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-black/60">
+            Email and password updates are handled by
+            Supabase Auth. Some changes may require
+            email confirmation.
+          </p>
+
+          <div className="mt-5 flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-black/10 bg-[#fafaf7] p-4">
+            <div>
+              <p className="text-sm font-semibold text-black">
+                Current session
+              </p>
+
+              <p className="mt-1 text-sm text-black/60">
+                Sign out of your Flowstate account
+                when you're finished.
+              </p>
+            </div>
+
+            <LogoutButton />
+          </div>
+        </section>
+
+        {/* ======================================
+            FUTURE PREFERENCES
+        ====================================== */}
+
+        <section
+          aria-labelledby="future-settings-heading"
+          className="space-y-4"
+        >
+          <div>
+            <h3
+              id="future-settings-heading"
+              className="text-lg font-semibold tracking-tight text-black"
+            >
+              Additional preferences
             </h3>
 
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-black/65">
-              A structured place for workspace, group, preference, and
-              notification controls.
+            <p className="mt-1 text-sm text-black/55">
+              More workspace customization is planned
+              for future releases.
             </p>
           </div>
 
-          <div className="grid gap-4 md:grid-cols-2">
-            {settingSections.map((section) => (
+          <div className="grid gap-4 md:grid-cols-3">
+            {futureSettings.map((setting) => (
               <article
-                key={section.title}
-                className="rounded-2xl border border-black/10 bg-[#fafaf7] p-5"
+                key={setting.title}
+                className="rounded-2xl border border-black/10 bg-white p-5 shadow-sm"
               >
-                <div className="flex items-start justify-between gap-3">
-                  <h4 className="text-lg font-semibold tracking-tight text-black">
-                    {section.title}
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <h4 className="text-base font-semibold text-black">
+                    {setting.title}
                   </h4>
 
-                  <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-black/55">
-                    {section.status}
+                  <span className="rounded-full bg-black/5 px-3 py-1 text-xs font-medium text-black/55">
+                    Planned
                   </span>
                 </div>
 
-                <p className="mt-2 text-sm leading-6 text-black/60">
-                  {section.description}
+                <p className="mt-3 text-sm leading-6 text-black/60">
+                  {setting.description}
                 </p>
-
-                <button
-                  type="button"
-                  disabled
-                  className="mt-4 rounded-xl border border-black/10 bg-white px-4 py-2 text-sm font-semibold text-black opacity-60"
-                >
-                  Configure later
-                </button>
               </article>
             ))}
           </div>
         </section>
-      </section>
+
+      </div>
     </AppShell>
   );
 }
