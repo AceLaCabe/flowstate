@@ -1,15 +1,23 @@
 // app/(app)/calendar/calendar-content.tsx
 
-import { redirect } from "next/navigation";
 import Link from "next/link";
+import { redirect } from "next/navigation";
+import type { ReactNode } from "react";
+
 import { createClient } from "@/lib/supabase/server";
 import AppShell from "@/components/layout/app-shell";
+
 import CreateEventForm from "@/components/forms/create-event-form";
-import EditEventForm from "@/components/calendar/edit-event-form";
-import DeleteEventButton from "@/components/calendar/delete-event-button";
-import CalendarView, {
-  type CalendarEvent,
-} from "@/components/calendar/calendar-view";
+
+import CalendarView from "@/components/calendar/calendar-view";
+import CalendarOverview from "@/components/calendar/calendar-overview";
+import EventCard from "@/components/calendar/event-card";
+
+import type { CalendarEntry } from "@/components/calendar/calendar-types";
+
+/* ==========================================================
+   TYPES
+========================================================== */
 
 type EventSummary = {
   id: string;
@@ -19,37 +27,30 @@ type EventSummary = {
   created_at: string;
 };
 
-function formatEventDateTime(date: string) {
-  return new Date(date).toLocaleString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
-}
+type ProjectDeadline = {
+  id: string;
+  title: string;
+  due_date: string | null;
+};
 
-function isToday(date: string) {
-  const eventDate = new Date(date);
-  const today = new Date();
+type TaskDeadline = {
+  id: string;
+  title: string;
+  due_date: string | null;
+  completed: boolean;
+  project_id: string;
+};
 
-  return (
-    eventDate.getFullYear() === today.getFullYear() &&
-    eventDate.getMonth() === today.getMonth() &&
-    eventDate.getDate() === today.getDate()
-  );
-}
-
-function isWithinNextSevenDays(date: string) {
-  const eventDate = new Date(date).getTime();
-  const now = new Date().getTime();
-  const sevenDaysFromNow = now + 7 * 24 * 60 * 60 * 1000;
-
-  return eventDate >= now && eventDate <= sevenDaysFromNow;
-}
+/* ==========================================================
+   CALENDAR CONTENT
+========================================================== */
 
 export default async function CalendarContent() {
   const supabase = await createClient();
+
+  /* --------------------------------------------------------
+     AUTHENTICATION
+  -------------------------------------------------------- */
 
   const {
     data: { user },
@@ -59,238 +60,387 @@ export default async function CalendarContent() {
     redirect("/auth/login");
   }
 
-  const { data: profile, error: profileError } = await supabase
-    .from("profiles")
-    .select("first_name, last_name, avatar_url")
-    .eq("id", user.id)
-    .maybeSingle();
+  /* --------------------------------------------------------
+     PROFILE AND WORKSPACE
+  -------------------------------------------------------- */
+
+  const { data: profile, error: profileError } =
+    await supabase
+      .from("profiles")
+      .select("first_name, last_name, avatar_url")
+      .eq("id", user.id)
+      .maybeSingle();
 
   if (profileError) {
-    throw new Error(`Profile load failed: ${profileError.message}`);
+    throw new Error(
+      `Profile load failed: ${profileError.message}`
+    );
   }
 
-  const { data: workspace, error: workspaceError } = await supabase
-    .from("workspaces")
-    .select("id, name")
-    .eq("owner_id", user.id)
-    .maybeSingle();
+  const { data: workspace, error: workspaceError } =
+    await supabase
+      .from("workspaces")
+      .select("id, name")
+      .eq("owner_id", user.id)
+      .maybeSingle();
 
   if (workspaceError) {
-    throw new Error(`Workspace lookup failed: ${workspaceError.message}`);
+    throw new Error(
+      `Workspace lookup failed: ${workspaceError.message}`
+    );
   }
 
   if (!workspace) {
     redirect("/dashboard");
   }
 
-  const { data: events, error: eventsError } = await supabase
-    .from("events")
-    .select("id, title, start_time, end_time, created_at")
-    .eq("workspace_id", workspace.id)
-    .order("start_time", { ascending: true });
+  /* --------------------------------------------------------
+     WORKSPACE CALENDAR DATA
+  -------------------------------------------------------- */
+
+  const [
+    { data: events, error: eventsError },
+    { data: projects, error: projectsError },
+    { data: tasks, error: tasksError },
+  ] = await Promise.all([
+    // Scheduled events
+    supabase
+      .from("events")
+      .select(
+        "id, title, start_time, end_time, created_at"
+      )
+      .eq("workspace_id", workspace.id)
+      .order("start_time", { ascending: true }),
+
+    // Project deadlines
+    supabase
+      .from("projects")
+      .select("id, title, due_date")
+      .eq("workspace_id", workspace.id)
+      .not("due_date", "is", null),
+
+    // Task deadlines belonging to workspace projects
+    supabase
+      .from("tasks")
+      .select(
+        `
+        id,
+        title,
+        due_date,
+        completed,
+        project_id,
+        projects!inner (
+          id,
+          workspace_id
+        )
+        `
+      )
+      .eq("projects.workspace_id", workspace.id)
+      .not("due_date", "is", null),
+  ]);
+
+  /* --------------------------------------------------------
+     QUERY ERRORS
+  -------------------------------------------------------- */
 
   if (eventsError) {
-    throw new Error(`Events load failed: ${eventsError.message}`);
+    throw new Error(
+      `Events load failed: ${eventsError.message}`
+    );
   }
 
-  const normalizedEvents = (events ?? []) as EventSummary[];
-  const calendarEvents = normalizedEvents as CalendarEvent[];
+  if (projectsError) {
+    throw new Error(
+      `Project deadlines failed to load: ${projectsError.message}`
+    );
+  }
 
-  const now = new Date().getTime();
+  if (tasksError) {
+    throw new Error(
+      `Task deadlines failed to load: ${tasksError.message}`
+    );
+  }
+
+  /* --------------------------------------------------------
+     NORMALIZE DATABASE RESULTS
+  -------------------------------------------------------- */
+
+  const normalizedEvents =
+    (events ?? []) as EventSummary[];
+
+  const normalizedProjects =
+    (projects ?? []) as ProjectDeadline[];
+
+  const normalizedTasks =
+    (tasks ?? []) as TaskDeadline[];
+
+  /* --------------------------------------------------------
+     UNIFIED CALENDAR ENTRIES
+
+     Scheduled events use timestamps.
+     Task and project deadlines use YYYY-MM-DD strings.
+
+     Date-only deadlines must not be converted to UTC.
+  -------------------------------------------------------- */
+
+  const calendarEntries: CalendarEntry[] = [
+    // Scheduled events
+    ...normalizedEvents.map((event) => ({
+      id: `event-${event.id}`,
+      title: event.title,
+      kind: "event" as const,
+      start_time: event.start_time,
+      end_time: event.end_time,
+    })),
+
+    // Task deadlines
+    ...normalizedTasks
+      .filter(
+        (
+          task
+        ): task is TaskDeadline & {
+          due_date: string;
+        } => task.due_date !== null
+      )
+      .map((task) => ({
+        id: `task-${task.id}`,
+        title: task.title,
+        kind: "task" as const,
+        start_time: task.due_date,
+        end_time: task.due_date,
+        href: "/tasks",
+        allDay: true,
+        completed: task.completed,
+      })),
+
+    // Project deadlines
+    ...normalizedProjects
+      .filter(
+        (
+          project
+        ): project is ProjectDeadline & {
+          due_date: string;
+        } => project.due_date !== null
+      )
+      .map((project) => ({
+        id: `project-${project.id}`,
+        title: project.title,
+        kind: "project" as const,
+        start_time: project.due_date,
+        end_time: project.due_date,
+        href: `/projects/${project.id}`,
+        allDay: true,
+      })),
+  ];
+
+  /* --------------------------------------------------------
+     EVENT LISTS
+
+     Classification uses absolute timestamps, not server
+     calendar dates, so time-zone conversion isn't needed.
+  -------------------------------------------------------- */
+
+  const nowMs = Date.now();
 
   const upcomingEvents = normalizedEvents.filter(
-    (event) => new Date(event.end_time).getTime() >= now
+    (event) =>
+      new Date(event.end_time).getTime() >= nowMs
   );
 
-  const pastEvents = normalizedEvents.filter(
-    (event) => new Date(event.end_time).getTime() < now
-  );
+  const pastEvents = normalizedEvents
+    .filter(
+      (event) =>
+        new Date(event.end_time).getTime() < nowMs
+    )
+    .reverse();
 
-  const todayEvents = upcomingEvents.filter((event) =>
-    isToday(event.start_time)
-  );
-
-  const weekEvents = upcomingEvents.filter((event) =>
-    isWithinNextSevenDays(event.start_time)
-  );
-
-  const nextEvent = upcomingEvents[0] ?? null;
-
-  const firstName = profile?.first_name ?? "User";
+  /* ========================================================
+     PAGE
+  ======================================================== */
 
   return (
     <AppShell
-      firstName={firstName}
+      firstName={profile?.first_name ?? "User"}
       lastName={profile?.last_name ?? ""}
       avatarUrl={profile?.avatar_url ?? null}
     >
-      <section className="space-y-8">
-        <div className="grid gap-5 xl:grid-cols-[1.2fr_0.8fr]">
-          <div className="rounded-[2rem] border border-black/10 bg-white p-6 shadow-sm sm:p-7">
-            <p className="text-sm font-medium text-black/55">
-              Schedule management
-            </p>
+      <div className="space-y-6">
 
-            <h2 className="mt-2 text-3xl font-semibold tracking-tight text-black sm:text-4xl">
-              Calendar
-            </h2>
+        {/* ======================================
+            01. PAGE INTRODUCTION
+        ====================================== */}
 
-            <p className="mt-3 max-w-2xl text-sm leading-6 text-black/65 sm:text-base">
-              Keep track of meetings, sessions, deadlines, and important time
-              blocks without crowding your workspace.
-            </p>
-
-            <div className="mt-6 rounded-2xl bg-[#fafaf7] p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-black/45">
-                Next schedule signal
+        <header className="rounded-[2rem] border border-black/10 bg-white p-5 shadow-sm sm:p-7">
+          <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+            <div className="max-w-2xl">
+              <p className="text-sm font-medium text-black/55">
+                {workspace.name}
               </p>
 
-              <p className="mt-2 text-sm leading-6 text-black/65">
-                {nextEvent
-                  ? `Your next event is “${nextEvent.title}” on ${formatEventDateTime(
-                      nextEvent.start_time
-                    )}.`
-                  : "Nothing is scheduled yet. Add an event when your work needs a time block."}
+              <h2 className="mt-2 text-3xl font-semibold tracking-tight text-black sm:text-4xl">
+                Calendar
+              </h2>
+
+              <p className="mt-3 text-sm leading-6 text-black/65 sm:text-base">
+                See your scheduled events, project deadlines,
+                and task due dates together in one place.
               </p>
             </div>
 
-            <div className="mt-6 flex flex-wrap gap-3">
+            <div className="flex flex-wrap gap-2">
               <Link
                 href="/tasks"
-                className="inline-flex items-center justify-center rounded-2xl border border-black/10 bg-[#fafaf7] px-5 py-3 text-sm font-semibold text-black transition hover:-translate-y-0.5 hover:bg-black/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black focus-visible:ring-offset-2"
+                className="inline-flex min-h-11 items-center justify-center rounded-xl border border-black/10 bg-[#fafaf7] px-4 py-2 text-sm font-semibold text-black transition hover:bg-black/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black focus-visible:ring-offset-2"
               >
                 Review tasks
               </Link>
 
               <Link
                 href="/projects"
-                className="inline-flex items-center justify-center rounded-2xl border border-black/10 bg-white px-5 py-3 text-sm font-semibold text-black transition hover:-translate-y-0.5 hover:bg-black/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black focus-visible:ring-offset-2"
+                className="inline-flex min-h-11 items-center justify-center rounded-xl border border-black/10 bg-white px-4 py-2 text-sm font-semibold text-black transition hover:bg-black/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black focus-visible:ring-offset-2"
               >
                 View projects
               </Link>
             </div>
           </div>
+        </header>
 
-          <div className="rounded-[2rem] border border-[#d7bfa8]/60 bg-[#fff7ed] p-6 shadow-sm sm:p-7">
-            <p className="text-sm font-medium text-[#7b533e]">Quick add</p>
+        {/* ======================================
+            02. EVENT CREATION
+        ====================================== */}
 
-            <h3 className="mt-2 text-2xl font-semibold tracking-tight text-[#3b2418]">
-              Add a time block
+        <section
+          aria-labelledby="calendar-create-heading"
+          className="rounded-[2rem] border border-[#d7bfa8]/70 bg-[#fff7ed] p-5 shadow-sm sm:p-6"
+        >
+          <p className="text-sm font-medium text-[#7b533e]">
+            Schedule something
+          </p>
+
+          <h3
+            id="calendar-create-heading"
+            className="mt-1 text-xl font-semibold tracking-tight text-[#3b2418] sm:text-2xl"
+          >
+            Add a time block
+          </h3>
+
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-[#7b533e]">
+            Set aside time for meetings, planning,
+            focused work, or anything else that
+            needs a place on your schedule.
+          </p>
+
+          <div className="mt-5">
+            <CreateEventForm workspaceId={workspace.id} />
+          </div>
+        </section>
+
+        {/* ======================================
+            03. UNIFIED CALENDAR
+        ====================================== */}
+
+        <CalendarView entries={calendarEntries} />
+
+        {/* ======================================
+            04. EVENT LISTS
+        ====================================== */}
+
+        <section
+          aria-labelledby="calendar-events-heading"
+          className="space-y-5"
+        >
+          <div>
+            <h3
+              id="calendar-events-heading"
+              className="text-xl font-semibold tracking-tight text-black sm:text-2xl"
+            >
+              Your schedule
             </h3>
 
-            <p className="mt-3 text-sm leading-6 text-[#7b533e]">
-              Use events for meetings, planning sessions, deadlines, and work
-              blocks that need a place on the schedule.
+            <p className="mt-2 text-sm leading-6 text-black/60">
+              Review upcoming commitments or revisit
+              previous events.
             </p>
-
-            <div className="mt-5">
-              <CreateEventForm workspaceId={workspace.id} />
-            </div>
           </div>
-        </div>
 
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <CalendarMetric
-            label="Today"
-            value={todayEvents.length}
-            description="Events on today’s schedule"
-            warm={todayEvents.length > 0}
-          />
+          <div className="space-y-5">
 
-          <CalendarMetric
-            label="This week"
-            value={weekEvents.length}
-            description="Coming up soon"
-          />
+            {/* UPCOMING EVENTS */}
 
-          <CalendarMetric
-            label="Upcoming"
-            value={upcomingEvents.length}
-            description="Still ahead"
-          />
+            <EventSection
+              title="Upcoming events"
+              description="Events that are still ahead or in progress."
+              count={upcomingEvents.length}
+              emptyTitle="Nothing scheduled yet"
+              emptyDescription="Add an event whenever your work needs a dedicated time block."
+            >
+              {upcomingEvents.map((event) => (
+                <EventCard
+                  key={event.id}
+                  event={event}
+                />
+              ))}
+            </EventSection>
 
-          <CalendarMetric
-            label="Past"
-            value={pastEvents.length}
-            description="Already ended"
-          />
-        </div>
+            {/* PAST EVENTS */}
 
-        <CalendarView events={calendarEvents} />
+            {pastEvents.length > 0 && (
+              <details className="group overflow-hidden rounded-2xl border border-black/10 bg-white shadow-sm">
+                <summary className="flex min-h-16 cursor-pointer list-none items-center justify-between gap-3 p-5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-black [&::-webkit-details-marker]:hidden">
+                  <div>
+                    <h4 className="text-base font-semibold text-black">
+                      Past events
+                    </h4>
 
-        <div className="grid gap-6 xl:grid-cols-2">
-          <EventColumn
-            title="Upcoming"
-            description="Events that are still ahead."
-            count={upcomingEvents.length}
-            emptyTitle="No upcoming events"
-            emptyDescription="Create your first event to start mapping your schedule."
-          >
-            {upcomingEvents.map((event) => (
-              <EventCard key={event.id} event={event} />
-            ))}
-          </EventColumn>
+                    <p className="mt-1 text-sm text-black/55">
+                      Previously scheduled time blocks.
+                    </p>
+                  </div>
 
-          <EventColumn
-            title="Past events"
-            description="Events that have already ended."
-            count={pastEvents.length}
-            emptyTitle="No past events yet"
-            emptyDescription="Completed events will appear here over time."
-          >
-            {pastEvents.map((event) => (
-              <EventCard key={event.id} event={event} past />
-            ))}
-          </EventColumn>
-        </div>
-      </section>
+                  <span className="inline-flex shrink-0 items-center gap-2 text-sm font-semibold text-black/65">
+                    {pastEvents.length}
+
+                    <span
+                      aria-hidden="true"
+                      className="transition-transform group-open:rotate-180"
+                    >
+                      ↓
+                    </span>
+                  </span>
+                </summary>
+
+                <div className="border-t border-black/10 p-4 sm:p-5">
+                  <div className="grid gap-4 lg:grid-cols-2">
+                    {pastEvents.map((event) => (
+                      <EventCard
+                        key={event.id}
+                        event={event}
+                        past
+                      />
+                    ))}
+                  </div>
+                </div>
+              </details>
+            )}
+          </div>
+        </section>
+
+        {/* ======================================
+            05. UNIFIED SCHEDULE OVERVIEW
+        ====================================== */}
+
+        <CalendarOverview entries={calendarEntries} />
+
+      </div>
     </AppShell>
   );
 }
 
-function CalendarMetric({
-  label,
-  value,
-  description,
-  warm = false,
-}: {
-  label: string;
-  value: number;
-  description: string;
-  warm?: boolean;
-}) {
-  return (
-    <section
-      className={`rounded-2xl border p-5 shadow-sm ${
-        warm
-          ? "border-[#d7bfa8]/60 bg-[#fff7ed]"
-          : "border-black/10 bg-white"
-      }`}
-    >
-      <h3
-        className={`text-sm font-medium ${
-          warm ? "text-[#7b533e]" : "text-black/65"
-        }`}
-      >
-        {label}
-      </h3>
+/* ==========================================================
+   EVENT SECTION
+========================================================== */
 
-      <p
-        className={`mt-3 text-3xl font-semibold tracking-tight ${
-          warm ? "text-[#3b2418]" : "text-black"
-        }`}
-      >
-        {value}
-      </p>
-
-      <p className={`mt-2 text-sm ${warm ? "text-[#7b533e]" : "text-black/55"}`}>
-        {description}
-      </p>
-    </section>
-  );
-}
-
-function EventColumn({
+function EventSection({
   title,
   description,
   count,
@@ -303,17 +453,19 @@ function EventColumn({
   count: number;
   emptyTitle: string;
   emptyDescription: string;
-  children: React.ReactNode;
+  children: ReactNode;
 }) {
   return (
-    <section className="rounded-[2rem] border border-black/10 bg-white p-5 shadow-sm sm:p-6">
-      <div className="mb-5 flex items-start justify-between gap-3">
+    <section className="rounded-2xl border border-black/10 bg-white p-5 shadow-sm sm:p-6">
+      <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h3 className="text-xl font-semibold tracking-tight text-black">
+          <h4 className="text-xl font-semibold tracking-tight text-black">
             {title}
-          </h3>
+          </h4>
 
-          <p className="mt-1 text-sm text-black/60">{description}</p>
+          <p className="mt-1 text-sm text-black/60">
+            {description}
+          </p>
         </div>
 
         <span className="rounded-full bg-black/5 px-3 py-1 text-xs font-semibold text-black/70">
@@ -322,55 +474,20 @@ function EventColumn({
       </div>
 
       {count > 0 ? (
-        <div className="space-y-4">{children}</div>
+        <div className="grid gap-4 lg:grid-cols-2">
+          {children}
+        </div>
       ) : (
-        <div className="rounded-2xl border border-dashed border-black/15 bg-[#fafaf7] p-4">
-          <p className="text-sm font-semibold text-black">{emptyTitle}</p>
+        <div className="rounded-2xl border border-dashed border-black/15 bg-[#fafaf7] p-5">
+          <p className="text-sm font-semibold text-black">
+            {emptyTitle}
+          </p>
 
-          <p className="mt-1 text-sm leading-6 text-black/60">
+          <p className="mt-2 text-sm leading-6 text-black/60">
             {emptyDescription}
           </p>
         </div>
       )}
     </section>
-  );
-}
-
-function EventCard({ event, past = false }: { event: EventSummary; past?: boolean }) {
-  return (
-    <article
-      className={`rounded-2xl border border-black/10 bg-[#fafaf7] p-4 transition hover:-translate-y-1 hover:shadow-[0_18px_45px_rgba(0,0,0,0.08)] ${
-        past ? "opacity-80" : ""
-      }`}
-    >
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h4 className="text-base font-semibold text-black">{event.title}</h4>
-
-          <p className="mt-2 text-sm text-black/60">
-            Starts: {formatEventDateTime(event.start_time)}
-          </p>
-
-          <p className="mt-1 text-sm text-black/55">
-            Ends: {formatEventDateTime(event.end_time)}
-          </p>
-        </div>
-
-        <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-black/60">
-          {past ? "Past" : "Upcoming"}
-        </span>
-      </div>
-
-      <div className="mt-4 flex flex-wrap gap-2 border-t border-black/5 pt-4">
-        <EditEventForm
-          eventId={event.id}
-          initialTitle={event.title}
-          initialStartTime={event.start_time}
-          initialEndTime={event.end_time}
-        />
-
-        <DeleteEventButton eventId={event.id} />
-      </div>
-    </article>
   );
 }

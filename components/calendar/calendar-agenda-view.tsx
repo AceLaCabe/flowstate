@@ -1,125 +1,299 @@
 // components/calendar/calendar-agenda-view.tsx
 
-import type { CalendarEvent } from "@/components/calendar/calendar-view";
+import Link from "next/link";
+
+import type { CalendarEntry } from "@/components/calendar/calendar-types";
+
+import {
+  formatZonedDateTime,
+  formatZonedTime,
+  getZonedDateKey,
+} from "@/lib/calendar/date-utils";
 
 type CalendarAgendaViewProps = {
-  events: CalendarEvent[];
-  currentDate: Date;
+  entries: CalendarEntry[];
+  timeZone: string;
 };
 
-function isAllDayEvent(event: CalendarEvent) {
-  const start = new Date(event.start_time);
-  const end = new Date(event.end_time);
+/* ==========================================================
+   DATE HELPERS
+========================================================== */
 
-  return (
-    start.getHours() === 0 &&
-    start.getMinutes() === 0 &&
-    end.getHours() === 23 &&
-    end.getMinutes() === 59
+function getEntryDateKey(
+  entry: CalendarEntry,
+  timeZone: string
+): string {
+  if (entry.kind === "event") {
+    return getZonedDateKey(entry.start_time, timeZone);
+  }
+
+  return entry.start_time;
+}
+
+function formatGroupDate(dateKey: string): string {
+  const [year, month, day] = dateKey.split("-").map(Number);
+
+  return new Date(year, month - 1, day).toLocaleDateString(
+    "en-US",
+    {
+      weekday: "long",
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    }
   );
 }
 
-function formatEventDate(date: string) {
-  return new Date(date).toLocaleDateString("en-US", {
-    weekday: "long",
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
+/* ==========================================================
+   ENTRY DISPLAY HELPERS
+========================================================== */
+
+function getEntryDescription(
+  entry: CalendarEntry,
+  timeZone: string,
+  todayKey: string
+): string {
+  if (entry.kind === "task") {
+    if (entry.completed) {
+      return "Completed task";
+    }
+
+    if (entry.start_time < todayKey) {
+      return "Overdue task";
+    }
+
+    if (entry.start_time === todayKey) {
+      return "Due today";
+    }
+
+    return "Task deadline";
+  }
+
+  if (entry.kind === "project") {
+    if (entry.start_time < todayKey) {
+      return "Past project deadline";
+    }
+
+    if (entry.start_time === todayKey) {
+      return "Project deadline today";
+    }
+
+    return "Project deadline";
+  }
+
+  const startKey = getZonedDateKey(
+    entry.start_time,
+    timeZone
+  );
+
+  const endKey = getZonedDateKey(
+    entry.end_time,
+    timeZone
+  );
+
+  if (startKey === endKey) {
+    return `${formatZonedTime(
+      entry.start_time,
+      timeZone
+    )} – ${formatZonedTime(
+      entry.end_time,
+      timeZone
+    )}`;
+  }
+
+  return `Starts ${formatZonedDateTime(
+    entry.start_time,
+    timeZone
+  )} · Ends ${formatZonedDateTime(
+    entry.end_time,
+    timeZone
+  )}`;
 }
 
-function formatEventTime(event: CalendarEvent) {
-  if (isAllDayEvent(event)) return "All day";
+function getEntryKindLabel(entry: CalendarEntry): string {
+  switch (entry.kind) {
+    case "task":
+      return "Task";
 
-  return `${new Date(event.start_time).toLocaleTimeString("en-US", {
-    hour: "numeric",
-    minute: "2-digit",
-  })} – ${new Date(event.end_time).toLocaleTimeString("en-US", {
-    hour: "numeric",
-    minute: "2-digit",
-  })}`;
+    case "project":
+      return "Project";
+
+    default:
+      return "Event";
+  }
 }
 
-function groupEventsByDate(events: CalendarEvent[]) {
-  return events.reduce<Record<string, CalendarEvent[]>>((groups, event) => {
-    const key = new Date(event.start_time).toDateString();
+function getEntryStyles(entry: CalendarEntry): string {
+  if (entry.kind === "task") {
+    return entry.completed
+      ? "border-green-200 bg-green-50"
+      : "border-[#d7bfa8]/70 bg-[#fff7ed]";
+  }
+
+  if (entry.kind === "project") {
+    return "border-black/15 bg-black/5";
+  }
+
+  return "border-black/10 bg-[#fafaf7]";
+}
+
+/* ==========================================================
+   CALENDAR AGENDA VIEW
+========================================================== */
+
+export default function CalendarAgendaView({
+  entries,
+  timeZone,
+}: CalendarAgendaViewProps) {
+  const todayKey = getZonedDateKey(new Date(), timeZone);
+
+  /* --------------------------------------------------------
+     GROUP ENTRIES BY CALENDAR DATE
+  -------------------------------------------------------- */
+
+  const grouped = entries.reduce<
+    Record<string, CalendarEntry[]>
+  >((groups, entry) => {
+    const key = getEntryDateKey(entry, timeZone);
 
     if (!groups[key]) {
       groups[key] = [];
     }
 
-    groups[key].push(event);
+    groups[key].push(entry);
 
     return groups;
   }, {});
-}
 
-export default function CalendarAgendaView({
-  events,
-  currentDate: _currentDate,
-}: CalendarAgendaViewProps) {
-  const sortedEvents = [...events].sort((a, b) => {
-    return new Date(a.start_time).getTime() - new Date(b.start_time).getTime();
-  });
+  const dates = Object.keys(grouped).sort();
 
-  const groupedEvents = groupEventsByDate(sortedEvents);
+  /* --------------------------------------------------------
+     EMPTY STATE
+  -------------------------------------------------------- */
 
-  const groupKeys = Object.keys(groupedEvents).sort(
-    (a, b) => new Date(a).getTime() - new Date(b).getTime()
-  );
-
-  if (sortedEvents.length === 0) {
+  if (dates.length === 0) {
     return (
       <div className="rounded-2xl border border-dashed border-black/15 bg-[#fafaf7] p-5">
-        <p className="text-sm font-semibold text-black">No events scheduled</p>
+        <p className="text-sm font-semibold text-black">
+          Nothing on the calendar yet
+        </p>
 
-        <p className="mt-1 text-sm leading-6 text-black/60">
-          Create events to see them grouped into a calm agenda view.
+        <p className="mt-2 text-sm leading-6 text-black/60">
+          Add an event, task deadline, or project deadline
+          to begin building your schedule.
         </p>
       </div>
     );
   }
 
+  /* ========================================================
+     AGENDA
+  ======================================================== */
+
   return (
     <div className="space-y-5">
-      {groupKeys.map((key) => {
-        const eventsForDay = groupedEvents[key];
+      {dates.map((dateKey) => {
+        const dayEntries = [...grouped[dateKey]].sort(
+          (a, b) => {
+            // Show deadlines before scheduled events.
+            if (
+              a.kind !== "event" &&
+              b.kind === "event"
+            ) {
+              return -1;
+            }
+
+            if (
+              a.kind === "event" &&
+              b.kind !== "event"
+            ) {
+              return 1;
+            }
+
+            return a.start_time.localeCompare(b.start_time);
+          }
+        );
 
         return (
-          <section key={key} className="space-y-3">
-            <div className="flex items-center justify-between gap-3">
-              <h4 className="text-sm font-semibold uppercase tracking-[0.14em] text-black/45">
-                {formatEventDate(eventsForDay[0].start_time)}
+          <section key={dateKey} className="space-y-3">
+            {/* DATE HEADING */}
+
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h4 className="text-xs font-semibold uppercase tracking-[0.12em] text-black/50 sm:text-sm">
+                {formatGroupDate(dateKey)}
               </h4>
 
               <span className="rounded-full bg-black/5 px-2.5 py-1 text-xs font-semibold text-black/55">
-                {eventsForDay.length}
+                {dayEntries.length}
               </span>
             </div>
 
+            {/* ENTRIES */}
+
             <div className="space-y-3">
-              {eventsForDay.map((event) => (
-                <article
-                  key={event.id}
-                  className="rounded-2xl border border-black/10 bg-[#fafaf7] p-4 transition hover:-translate-y-1 hover:shadow-[0_18px_45px_rgba(0,0,0,0.08)]"
-                >
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                    <div>
-                      <h5 className="text-base font-semibold text-black">
-                        {event.title}
+              {dayEntries.map((entry) => {
+                const description = getEntryDescription(
+                  entry,
+                  timeZone,
+                  todayKey
+                );
+
+                const content = (
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <h5 className="break-words text-base font-semibold text-black">
+                        {entry.title}
                       </h5>
 
-                      <p className="mt-2 text-sm text-black/60">
-                        {formatEventTime(event)}
+                      <p
+                        className={[
+                          "mt-2 text-sm leading-6",
+                          entry.kind === "task" &&
+                          !entry.completed &&
+                          entry.start_time < todayKey
+                            ? "font-medium text-red-700"
+                            : "text-black/60",
+                        ].join(" ")}
+                      >
+                        {description}
                       </p>
                     </div>
 
-                    <span className="inline-flex w-fit rounded-full bg-white px-3 py-1 text-xs font-semibold text-black/60">
-                      Schedule
+                    <span className="inline-flex shrink-0 rounded-full bg-white px-3 py-1 text-xs font-semibold text-black/60">
+                      {getEntryKindLabel(entry)}
                     </span>
                   </div>
-                </article>
-              ))}
+                );
+
+                const className = [
+                  "block rounded-2xl border p-4",
+                  getEntryStyles(entry),
+                  entry.href
+                    ? "transition hover:border-black/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black"
+                    : "",
+                ].join(" ");
+
+                if (entry.href) {
+                  return (
+                    <Link
+                      key={entry.id}
+                      href={entry.href}
+                      className={className}
+                    >
+                      {content}
+                    </Link>
+                  );
+                }
+
+                return (
+                  <article
+                    key={entry.id}
+                    className={className}
+                  >
+                    {content}
+                  </article>
+                );
+              })}
             </div>
           </section>
         );

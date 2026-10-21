@@ -1,107 +1,140 @@
 // components/calendar/calendar-month-view.tsx
 
-import type { CalendarEvent } from "@/components/calendar/calendar-view";
+import Link from "next/link";
+
+import type { CalendarEntry } from "@/components/calendar/calendar-types";
+
+import {
+  eventOccursOnDate,
+  getCalendarDateKey,
+  getEventDayLabel,
+} from "@/lib/calendar/date-utils";
 
 type CalendarMonthViewProps = {
-  events: CalendarEvent[];
+  entries: CalendarEntry[];
   currentDate: Date;
+  timeZone: string;
 };
 
+const weekdayLabels = [
+  "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat",
+];
+
 function startOfMonthGrid(date: Date) {
-  const first = new Date(date.getFullYear(), date.getMonth(), 1);
-  const day = first.getDay();
-  const gridStart = new Date(first);
-  gridStart.setDate(first.getDate() - day);
-  gridStart.setHours(0, 0, 0, 0);
-  return gridStart;
-}
-
-function sameDay(a: Date, b: Date) {
-  return (
-    a.getFullYear() === b.getFullYear() &&
-    a.getMonth() === b.getMonth() &&
-    a.getDate() === b.getDate()
+  const first = new Date(
+    date.getFullYear(),
+    date.getMonth(),
+    1
   );
+
+  const start = new Date(first);
+  start.setDate(first.getDate() - first.getDay());
+  start.setHours(0, 0, 0, 0);
+
+  return start;
 }
 
-function occursOnDate(event: CalendarEvent, date: Date) {
-  const start = new Date(event.start_time);
-  const end = new Date(event.end_time);
+function occursOnDate(
+  entry: CalendarEntry,
+  date: Date,
+  timeZone: string
+) {
+  if (entry.kind === "event") {
+    return eventOccursOnDate(entry, date, timeZone);
+  }
 
-  const dayStart = new Date(date);
-  dayStart.setHours(0, 0, 0, 0);
-
-  const dayEnd = new Date(date);
-  dayEnd.setHours(23, 59, 59, 999);
-
-  return start <= dayEnd && end >= dayStart;
+  return entry.start_time === getCalendarDateKey(date);
 }
 
-function isAllDayEvent(event: CalendarEvent) {
-  const start = new Date(event.start_time);
-  const end = new Date(event.end_time);
+function getEntryLabel(
+  entry: CalendarEntry,
+  date: Date,
+  timeZone: string
+) {
+  if (entry.kind === "event") {
+    return getEventDayLabel(entry, date, timeZone);
+  }
 
-  return (
-    start.getHours() === 0 &&
-    start.getMinutes() === 0 &&
-    end.getHours() === 23 &&
-    end.getMinutes() === 59
-  );
+  if (entry.kind === "task") {
+    return entry.completed ? "Completed" : "Due";
+  }
+
+  return "Deadline";
 }
 
-const weekdayLabels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+function getEntryStyles(entry: CalendarEntry) {
+  if (entry.kind === "task") {
+    return entry.completed
+      ? "border-green-200 bg-green-50 text-green-900"
+      : "border-[#d7bfa8]/70 bg-[#fff7ed] text-[#3b2418]";
+  }
+
+  if (entry.kind === "project") {
+    return "border-black/15 bg-black text-white";
+  }
+
+  return "border-black/10 bg-white text-black";
+}
 
 export default function CalendarMonthView({
-  events,
+  entries,
   currentDate,
+  timeZone,
 }: CalendarMonthViewProps) {
   const gridStart = startOfMonthGrid(currentDate);
-  const today = new Date();
+  const todayKey = getCalendarDateKey(new Date());
 
   const days = Array.from({ length: 42 }, (_, index) => {
-    const d = new Date(gridStart);
-    d.setDate(gridStart.getDate() + index);
-    return d;
+    const date = new Date(gridStart);
+    date.setDate(gridStart.getDate() + index);
+    return date;
   });
 
   return (
     <div>
-      <div className="mb-3 grid grid-cols-7 gap-2">
+      <div className="mb-3 grid grid-cols-7 gap-1 sm:gap-2">
         {weekdayLabels.map((label) => (
           <div
             key={label}
-            className="px-2 py-2 text-center text-xs font-medium uppercase tracking-[0.18em] text-black/45"
+            className="min-w-0 py-2 text-center text-[10px] font-medium uppercase tracking-normal text-black/50 sm:text-xs sm:tracking-[0.12em]"
           >
             {label}
           </div>
         ))}
       </div>
 
-      <div className="grid grid-cols-7 gap-2">
+      <div className="grid grid-cols-7 gap-1 sm:gap-2">
         {days.map((day) => {
-          const inCurrentMonth = day.getMonth() === currentDate.getMonth();
-          const dayEvents = events.filter((event) => occursOnDate(event, day));
-          const isToday = sameDay(day, today);
+          const dayKey = getCalendarDateKey(day);
+          const isToday = dayKey === todayKey;
+
+          const inCurrentMonth =
+            day.getMonth() === currentDate.getMonth() &&
+            day.getFullYear() === currentDate.getFullYear();
+
+          const dayEntries = entries.filter((entry) =>
+            occursOnDate(entry, day, timeZone)
+          );
 
           return (
             <div
-              key={day.toISOString()}
+              key={dayKey}
               className={[
-                "min-h-[120px] rounded-2xl border p-2",
+                "min-h-[120px] min-w-0 rounded-2xl border p-1.5 sm:p-2",
                 inCurrentMonth
                   ? "border-black/10 bg-[#fafaf7]"
                   : "border-black/5 bg-black/[0.02]",
               ].join(" ")}
             >
-              <div className="mb-2 flex items-center justify-between">
+              <div className="mb-2">
                 <span
                   className={[
                     "inline-flex h-7 w-7 items-center justify-center rounded-full text-xs font-medium",
                     isToday
                       ? "bg-black text-white"
                       : inCurrentMonth
-                      ? "text-black"
-                      : "text-black/35",
+                        ? "text-black"
+                        : "text-black/35",
                   ].join(" ")}
                 >
                   {day.getDate()}
@@ -109,27 +142,61 @@ export default function CalendarMonthView({
               </div>
 
               <div className="space-y-1">
-                {dayEvents.slice(0, 3).map((event) => (
-                  <div
-                    key={`${event.id}-${day.toISOString()}`}
-                    className="rounded-lg bg-white px-2 py-1 text-[11px] leading-4 text-black shadow-sm ring-1 ring-black/5"
-                    title={event.title}
-                  >
-                    <div className="truncate font-medium">{event.title}</div>
-                    <div className="truncate text-black/55">
-                      {isAllDayEvent(event)
-                        ? "All day"
-                        : new Date(event.start_time).toLocaleTimeString("en-US", {
-                            hour: "numeric",
-                            minute: "2-digit",
-                          })}
-                    </div>
-                  </div>
-                ))}
+                {dayEntries.slice(0, 3).map((entry) => {
+                  const content = (
+                    <>
+                      <div className="truncate font-semibold">
+                        {entry.title}
+                      </div>
 
-                {dayEvents.length > 3 && (
+                      <div
+                        className={[
+                          "truncate",
+                          entry.kind === "project"
+                            ? "text-white/75"
+                            : "opacity-65",
+                        ].join(" ")}
+                      >
+                        {getEntryLabel(entry, day, timeZone)}
+                      </div>
+                    </>
+                  );
+
+                  const className = [
+                    "block min-w-0 rounded-lg border px-1.5 py-1 text-[11px] leading-4 sm:px-2",
+                    getEntryStyles(entry),
+                    entry.href
+                      ? "transition hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black"
+                      : "",
+                  ].join(" ");
+
+                  return entry.href ? (
+                    <Link
+                      key={entry.id}
+                      href={entry.href}
+                      title={`${entry.title} — ${getEntryLabel(
+                        entry,
+                        day,
+                        timeZone
+                      )}`}
+                      className={className}
+                    >
+                      {content}
+                    </Link>
+                  ) : (
+                    <div
+                      key={entry.id}
+                      title={entry.title}
+                      className={className}
+                    >
+                      {content}
+                    </div>
+                  );
+                })}
+
+                {dayEntries.length > 3 && (
                   <div className="px-1 text-[11px] text-black/55">
-                    +{dayEvents.length - 3} more
+                    +{dayEntries.length - 3} more
                   </div>
                 )}
               </div>
